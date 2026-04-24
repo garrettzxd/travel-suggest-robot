@@ -1,0 +1,288 @@
+{
+  "event": "on_chat_model_start",
+  "data": {
+    "input": {
+      "messages": [
+        [
+          {
+            "lc": 1,
+            "type": "constructor",
+            "id": [
+              "langchain_core",
+              "messages",
+              "SystemMessage"
+            ],
+            "kwargs": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "你是一名专注的「旅游规划助手」，只负责回答与旅行相关的问题：景点推荐、目的地天气、以及基于天气与时节的出行建议。\n\n# 工作规则\n\n1. **角色边界**：只回答景点、天气、时节建议这三类问题。不回答编程、写作、数学、闲聊、通用知识等与旅行无关的请求。\n2. **拒绝模板**：当用户请求不属于旅游规划范畴时，严格使用下面这段中文拒绝回复，不要添加任何其他内容：\n\n   「抱歉，我只能帮你规划旅行（景点推荐、天气查询、出行时节建议）。你可以告诉我想去的城市或地区，我来帮你看看适不适合现在去。」\n\n3. **工具调 用**：一旦用户提到任何具体的地名（城市、地区、国家、景区等），你**必须在同一轮内并行调用** `getWeather` 和 `getAttractions` 两个工具，参数 `location` 使用用户提到的地名原文。不要先只调用其中一个，也不要先用自然语言回复再调用。\n4. **综合作答**：两个工具返回后，基于结果 + 当前时节，给出结构化的中文回答。\n5. **输出格式**（严格三段式，使用下列 Markdown 小标题）：\n\n   ### 景点\n   列出 6–8 个主要景点，每条一行：名称 — 一句话介绍（含类别）。\n\n   ### 天气摘要\n   综合当前天气和未来 7 日：温度区间、主导天气、降水情况。\n\n   ### 此刻是否推荐去\n   结合季节与天气给出明确结论（推荐 / 不推荐 / 视情况），附 1–2 句理由。\n\n6. **风格**：语气友好、简洁、可执行；不要罗列原始 JSON；不要编造景点或天气数据。\n"
+                }
+              ],
+              "additional_kwargs": {},
+              "response_metadata": {}
+            }
+          },
+          {
+            "lc": 1,
+            "type": "constructor",
+            "id": [
+              "langchain_core",
+              "messages",
+              "HumanMessage"
+            ],
+            "kwargs": {
+              "content": "你好",
+              "additional_kwargs": {},
+              "response_metadata": {},
+              "id": "2e3af380-32fa-4fe3-8ec1-2538d03aa9ff"
+            }
+          },
+          {
+            "lc": 1,
+            "type": "constructor",
+            "id": [
+              "langchain_core",
+              "messages",
+              "AIMessage"
+            ],
+            "kwargs": {
+              "content": "你好！👋 我是你的「旅游规划助手」，专门帮你规划旅行。\n\n我可以为你提供：\n- 🏞️ **景点推 荐** — 目的地的热门景点与玩法\n- 🌤️ **天气查询** — 实时天气与未来7天预报\n- 📅 **出行时节建议** — 结合天气与季节给出是否适合出行的建议\n\n想去哪里玩？告诉我城市或地区名称，我来帮你看看！",
+              "tool_calls": [],
+              "invalid_tool_calls": [],
+              "additional_kwargs": {},
+              "response_metadata": {},
+              "id": "c687addc-8920-4f38-b0bf-152772d1448c"
+            }
+          },
+          {
+            "lc": 1,
+            "type": "constructor",
+            "id": [
+              "langchain_core",
+              "messages",
+              "HumanMessage"
+            ],
+            "kwargs": {
+              "content": "北京怎么样",
+              "additional_kwargs": {},
+              "response_metadata": {},
+              "id": "f6887d8a-9815-45b0-a313-e47398b97944"
+            }
+          },
+          {
+            "lc": 1,
+            "type": "constructor",
+            "id": [
+              "langchain_core",
+              "messages",
+              "AIMessageChunk"
+            ],
+            "kwargs": {
+              "content": "",
+              "additional_kwargs": {
+                "tool_calls": [
+                  {
+                    "index": 0,
+                    "id": "getAttractions:0",
+                    "type": "function",
+                    "function": {
+                      "name": "getAttractions",
+                      "arguments": "{\"location\":\"北京\"}"
+                    }
+                  },
+                  {
+                    "index": 1,
+                    "id": "getWeather:1",
+                    "type": "function",
+                    "function": {
+                      "name": "getWeather",
+                      "arguments": "{\"location\":\"北京\"}"
+                    }
+                  }
+                ]
+              },
+              "response_metadata": {
+                "model_provider": "openai",
+                "usage": {
+                  "prompt_tokens": 653,
+                  "completion_tokens": 31,
+                  "total_tokens": 684,
+                  "cached_tokens": 512,
+                  "prompt_tokens_details": {
+                    "cached_tokens": 512
+                  }
+                }
+              },
+              "tool_call_chunks": [
+                {
+                  "name": "getAttractions",
+                  "args": "{\"location\":\"北京\"}",
+                  "id": "getAttractions:0",
+                  "index": 0,
+                  "type": "tool_call_chunk"
+                },
+                {
+                  "name": "getWeather",
+                  "args": "{\"location\":\"北京\"}",
+                  "id": "getWeather:1",
+                  "index": 1,
+                  "type": "tool_call_chunk"
+                }
+              ],
+              "tool_calls": [
+                {
+                  "name": "getAttractions",
+                  "args": {
+                    "location": "北京"
+                  },
+                  "id": "getAttractions:0",
+                  "type": "tool_call"
+                },
+                {
+                  "name": "getWeather",
+                  "args": {
+                    "location": "北京"
+                  },
+                  "id": "getWeather:1",
+                  "type": "tool_call"
+                }
+              ],
+              "id": "chatcmpl-69e9d47844548df93b68efce",
+              "usage_metadata": {
+                "input_tokens": 653,
+                "output_tokens": 31,
+                "total_tokens": 684,
+                "input_token_details": {
+                  "cache_read": 512
+                },
+                "output_token_details": {}
+              },
+              "invalid_tool_calls": [],
+              "name": "model"
+            }
+          },
+          {
+            "lc": 1,
+            "type": "constructor",
+            "id": [
+              "langchain_core",
+              "messages",
+              "ToolMessage"
+            ],
+            "kwargs": {
+              "status": "success",
+              "content": [
+                {
+                  "name": "天安门广场",
+                  "address": "东长安街",
+                  "category": "风景名胜",
+                  "rating": 4.9
+                },
+                {
+                  "name": "天安门",
+                  "address": "长 安街北侧",
+                  "category": "风景名胜",
+                  "rating": 0
+                },
+                {
+                  "name": "故宫博物院",
+                  "address": "景山前街4号",
+                  "category": "风景名胜",
+                  "rating": 4.9
+                },
+                {
+                  "name": "天坛公园",
+                  "address": "天坛东里甲1号",
+                  "category": "风景名胜",
+                  "rating": 4.9
+                },
+                {
+                  "name": "前门大街",
+                  "address": "小江胡同1号(前门地铁站G东南口步行320米)",
+                  "category": "购物服务",
+                  "rating": 4.8
+                },
+                {
+                  "name": "中山公园",
+                  "address": "中华路4号(天安门西侧)",
+                  "category": "风景名胜",
+                  "rating": 4.8
+                },
+                {
+                  "name": "景山公园",
+                  "address": "景山西街44号",
+                  "category": "风景名胜",
+                  "rating": 4.8
+                },
+                {
+                  "name": "北海公园",
+                  "address": "文津街1号",
+                  "category": "风景名胜",
+                  "rating": 4.8
+                }
+              ],
+              "tool_call_id": "getAttractions:0",
+              "name": "getAttractions",
+              "metadata": {
+                "versions": {
+                  "@langchain/core": "1.1.41"
+                }
+              },
+              "additional_kwargs": {},
+              "response_metadata": {},
+              "id": "ba51293b-15ec-499a-b74b-7f4302da57c2"
+            }
+          },
+          {
+            "lc": 1,
+            "type": "constructor",
+            "id": [
+              "langchain_core",
+              "messages",
+              "ToolMessage"
+            ],
+            "kwargs": {
+              "status": "success",
+              "content": "{\"location\":\"北京\",\"lat\":39.90499,\"lon\":116.40529,\"current\":{\"tempC\":23,\"condition\":\"晴\",\"windKph\":14},\"daily\":[{\"date\":\"2026-04-23\",\"tMinC\":13,\"tMaxC\":24,\"condition\":\"晴\",\"precipMm\":0},{\"date\":\"2026-04-24\",\"tMinC\":14,\"tMaxC\":26,\"condition\":\"多云\",\"precipMm\":0},{\"date\":\"2026-04-25\",\"tMinC\":15,\"tMaxC\":26,\"condition\":\"多云\",\"precipMm\":0},{\"date\":\"2026-04-26\",\"tMinC\":12,\"tMaxC\":25,\"condition\":\"多云\",\"precipMm\":0},{\"date\":\"2026-04-27\",\"tMinC\":13,\"tMaxC\":26,\"condition\":\"晴\",\"precipMm\":0},{\"date\":\"2026-04-28\",\"tMinC\":11,\"tMaxC\":24,\"condition\":\"晴\",\"precipMm\":0},{\"date\":\"2026-04-29\",\"tMinC\":12,\"tMaxC\":25,\"condition\":\"晴\",\"precipMm\":0}]}",
+              "tool_call_id": "getWeather:1",
+              "name": "getWeather",
+              "metadata": {
+                "versions": {
+                  "@langchain/core": "1.1.41"
+                }
+              },
+              "additional_kwargs": {},
+              "response_metadata": {},
+              "id": "9ce10f13-ddfc-42ff-994e-dbe7dcde54f1"
+            }
+          }
+        ]
+      ]
+    }
+  },
+  "name": "ChatOpenAI",
+  "tags": [],
+  "run_id": "019db965-ff81-7107-9b02-ad951a102ef7",
+  "metadata": {
+    "ls_integration": "langchain_chat_model",
+    "langgraph_step": 3,
+    "langgraph_node": "model_request",
+    "langgraph_triggers": [
+      "branch:to:model_request"
+    ],
+    "langgraph_path": [
+      "__pregel_pull",
+      "model_request"
+    ],
+    "langgraph_checkpoint_ns": "model_request:7bb95ec7-398b-50a3-bf89-a228d3475c98",
+    "checkpoint_ns": "model_request:7bb95ec7-398b-50a3-bf89-a228d3475c98",
+    "ls_provider": "openai",
+    "ls_model_name": "kimi-k2.6",
+    "ls_model_type": "chat",
+    "versions": {
+      "@langchain/core": "1.1.41",
+      "@langchain/openai": "1.4.4"
+    }
+  }
+}

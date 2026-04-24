@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:24-alpine AS builder
+WORKDIR /app
+RUN corepack enable
+
+COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/server/package.json apps/server/
+
+RUN pnpm install
+
+COPY packages/shared packages/shared
+COPY apps/server apps/server
+
+RUN pnpm --filter @travel/shared build \
+ && pnpm --filter @travel/server build
+
+FROM node:24-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+RUN corepack enable
+
+COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
+COPY packages/shared/package.json packages/shared/
+COPY apps/server/package.json apps/server/
+
+RUN pnpm install --prod --filter @travel/server...
+
+COPY --from=builder /app/packages/shared/dist /app/packages/shared/dist
+COPY --from=builder /app/apps/server/dist /app/apps/server/dist
+
+WORKDIR /app/apps/server
+EXPOSE 3001
+CMD ["node", "dist/index.js"]

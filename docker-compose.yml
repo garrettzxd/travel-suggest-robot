@@ -1,0 +1,21 @@
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    env_file:
+      - .env
+    environment:
+      PORT: 3001
+      CORS_ORIGIN: http://localhost:8080
+    ports:
+      - "3001:3001"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    depends_on:
+      - server
+    ports:
+      - "8080:80"

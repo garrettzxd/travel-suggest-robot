@@ -1,0 +1,37 @@
+{
+  "name": "@travel/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsc -b && (trap 'kill 0' EXIT INT TERM; tsc -b -w --preserveWatchOutput & dotenv -e ../../.env -- node --watch dist/index.js)",
+    "build": "tsc -p .",
+    "start": "dotenv -e ../../.env -- node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "ping:llm": "tsc -b && dotenv -e ../../.env -- node dist/scripts/ping-llm.js",
+    "ping:weather": "tsc -b && AMAP_KEY=dummy dotenv -e ../../.env -- node dist/scripts/ping-qweather.js"
+  },
+  "dependencies": {
+    "@travel/shared": "workspace:*",
+    "@koa/bodyparser": "^5.0.0",
+    "@koa/cors": "^5.0.0",
+    "@koa/router": "^13.0.0",
+    "@langchain/core": "^1.0.0",
+    "@langchain/openai": "^1.0.0",
+    "jose": "^5.9.0",
+    "koa": "^2.15.3",
+    "koa-pino-logger": "^4.0.0",
+    "langchain": "^1.0.0",
+    "pino": "^9.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/koa": "^2.15.0",
+    "@types/koa__cors": "^5.0.0",
+    "@types/koa__router": "^12.0.4",
+    "@types/node": "^24.0.0",
+    "dotenv-cli": "^7.4.2",
+    "pino-pretty": "^11.2.2",
+    "typescript": "^5.6.0"
+  }
+}
