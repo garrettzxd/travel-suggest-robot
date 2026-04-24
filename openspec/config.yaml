@@ -1,0 +1,63 @@
+schema: spec-driven
+
+context: |
+  Project: travel-suggest-robot
+  OpenSpec usage: 作为轻量变更提案工具使用，重点是沉淀每次改动的上下文、范围、约束与结论，避免后续迭代反复从代码重新建立背景。
+  Artifact language: 中文为主；代码标识、API 名、事件名、库名保留英文。
+  Repository structure: pnpm monorepo，workspace 为 apps/* 和 packages/*。
+  Core workspaces:
+    - apps/web: React 19 + Vite 6 + TypeScript + Ant Design / Ant Design X
+    - apps/server: Node.js + TypeScript + Koa + LangChain/OpenAI-compatible provider
+    - packages/shared: 前后端共享类型、聊天协议、SSE 常量
+  Module conventions:
+    - 全仓库使用 ES Modules
+    - 前后端共享协议优先放在 packages/shared，避免重复定义
+  Product domain: 旅游规划聊天机器人，核心能力是景点推荐、天气查询、出行建议；UI 与文档默认中文。
+  Runtime behavior:
+    - 前后端通过 /api/chat 的 SSE 流通信
+    - 涉及聊天、流式输出、tool trace、事件协议的改动，默认同时检查 web、server、shared 三层影响
+  Important directories:
+    - plans/: 产品方案、PRD、设计规划
+    - questions/: 排障记录、问题复盘
+    - openspec/specs/: 已确认行为与能力边界的规格沉淀
+    - openspec/changes/: 每次变更的提案、设计、任务与增量规格
+  Validation reality:
+    - 当前项目主要依赖 pnpm -r typecheck 与 pnpm build 做验证
+    - 仓库内暂无成熟的单元测试 / E2E 测试体系时，不要虚构测试要求
+  Change boundaries:
+    - 主要变更范围通常在 apps/web、apps/server、packages/shared
+    - 默认不要修改 dist/、node_modules/、*.tsbuildinfo、.env、secrets/ 等产物或敏感文件
+  Documentation expectations:
+    - 影响交互流程、接口协议、SSE 事件、排障结论的改动，应同步更新 plans/ 或 questions/ 中相关文档
+    - 视觉或产品方案优先沉淀到 plans/；问题定位与修复过程优先沉淀到 questions/
+  Code style cues:
+    - TypeScript 代码保持显式、直接、可维护
+    - 注释以中文为主；复杂逻辑、协议兼容、流式处理、边界条件需要解释清楚
+    - apps/web/src 下的函数默认应有基础注释
+
+rules:
+  proposal:
+    - 把 proposal 写成轻量变更提案，重点说明为什么改、改什么、影响哪里，而不是重型立项文档。
+    - 明确说明这次变更影响的 workspace 和目录范围。
+    - 若涉及 API、SSE、共享类型、前后端联动，必须在 proposal 中点明。
+    - 包含兼容性影响、潜在风险、回滚思路。
+    - 如果变更会影响现有 plans/ 或 questions/ 文档，需在 proposal 中列出需要同步更新的文档。
+
+  specs:
+    - specs 用来沉淀行为变化与长期上下文，不追求过度形式化。
+    - 行为类需求优先使用 Given/When/Then 表达。
+    - 明确区分 ADDED、MODIFIED、REMOVED requirements。
+    - 涉及聊天协议、SSE 事件、共享类型时，写清楚请求/响应或事件级别的变化。
+    - 视觉类或交互类需求可使用中文验收条目，不强制整篇都写成 Given/When/Then。
+
+  design:
+    - 设计文档必须标明变更发生在 web、server、shared 的哪一层。
+    - 涉及前后端联动时，写清楚数据流和职责边界，避免把协议变化藏在实现细节里。
+    - 涉及环境变量、密钥、代理、流式输出、兼容性时，单独列风险与约束。
+    - 优先复用现有模式与目录结构，不无故引入新层级或新抽象。
+
+  tasks:
+    - 任务按 workspace 或职责边界拆分，避免把 web、server、shared 混成一个大任务。
+    - 若变更涉及协议联动，任务中要显式包含 shared 类型或文档同步项。
+    - 包含必要的验证任务，但不要假设项目存在未接入的测试框架。
+    - 若影响 plans/ 或 questions/，补一个文档更新任务。

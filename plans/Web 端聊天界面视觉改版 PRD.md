@@ -295,37 +295,83 @@ Props：`TravelVerdict & { headline: string; followUps?: string[] }`
 
 ### 7.3 组件抽离（新目录 `apps/web/src/chat/cards/`）
 
-**设计原则**：每个卡片都是独立可复用组件，入参完全自包含；可单独使用，也可由 `TripCardView` 组合。**每个卡片都接受 `loading?: boolean` 或在数据缺失时自动进入骨架态**，避免调用方各自实现占位。
+**设计原则**：先提供一个统一的基础卡片容器，再由各业务卡片在其上组合内容。每个卡片都是独立可复用组件，入参完全自包含；可单独使用，也可由 `TripCardView` 组合。**每个卡片都接受 `loading?: boolean` 或在数据缺失时自动进入骨架态**，避免调用方各自实现占位；**所有卡片的边框、阴影、背景色都收敛到基础卡片容器处理**，业务组件不重复定义这层外观。
 
-#### 7.3.1 `DestinationHero.tsx`
+#### 7.3.1 `CardContainer.tsx`
+
+- props：`{ children: ReactNode; backgroundColor?: string; className?: string; style?: CSSProperties }`
+- 职责边界：这是**所有卡片的基础外壳组件**，只负责统一卡片的：
+  - 边框
+  - 背景色
+  - 阴影
+  - 圆角与基础内边距
+- 默认样式：
+  - 背景色默认白色（`colorSurface = #FFFFFF`）
+  - 细描边使用 `colorStroke`
+  - 阴影使用 `shadowCard`
+  - 不承载任何业务文案、图标、骨架逻辑或布局语义
+- 可配置项：
+  - 允许通过 `backgroundColor` 覆盖默认白底，用于 WelcomeCard 内部三块能力面板或后续需要浅色底的卡片
+  - 允许透传 `className/style` 供外层布局微调，但不能绕过基础边框 / 阴影规范
+- 使用约束：
+  - `WelcomeCard`、`DestinationHero`、`WeatherCard`、`AttractionList`、`RecommendationPanel` 都必须基于该容器实现
+  - 若某个组件内部还存在子卡片样式，也优先继续复用 `CardContainer`，避免手写第二套边框阴影体系
+
+#### 7.3.2 `WelcomeCard.tsx`
+
+- props：`{ onSuggestionClick: (text: string) => void }`
+- 触发条件：`messages.length === 0`，作为**新会话初始化默认欢迎卡片**展示，不进入消息流，不占用 assistant message。
+- 外层必须使用 `CardContainer`；能力面板也建议复用 `CardContainer`，仅通过 `backgroundColor` 区分粉 / 浅蓝 / 沙色底。
+- 结构按参考稿固定为 4 段：
+  1. 欢迎语主文案：「你好，欢迎踏上新的旅程。我是 漫游——你的行程规划伙伴，擅长把一个城市名字变成一份可执行的出行建议。」
+  2. 三列能力面板：
+     - 景点推荐 / 值得打卡的去处
+     - 天气查询 / 实时 + 7 日预报
+     - 出行建议 / 季节与当季贴士
+  3. 虚线分隔线。
+  4. 底部引导语：「告诉我想去的城市或地区，或试试下方的建议 ↓」
+- 视觉要求：
+  - 外层为大圆角白底卡片，弱描边 + 轻阴影，宽度跟随聊天内容区 `max-width: 960px`。
+  - 三个能力面板采用横向 3 栏布局，分别映射粉 / 浅蓝 / 沙色底，图标置左，标题加粗，副标题弱化。
+  - 移动端降级为纵向堆叠，但桌面态优先保证与参考图一致。
+- 交互要求：
+  - 本轮仅定义组件和文案结构，不引入 chips 列表；若后续恢复示例 prompt，则放在引导语下方扩展，不影响当前卡片主体。
+  - 点击建议项的能力面板本身**不触发请求**，避免误交互；真正发送仍由输入框或后续 chips 承担。
+
+#### 7.3.3 `DestinationHero.tsx`
 
 - props：`{ data?: TripCard['hero']; loading?: boolean }`
+- 外层使用 `CardContainer`，hero 图、breadcrumb、标题、tagline 都属于容器内部内容区。
 - 数据态：region breadcrumb + h1 城市名 + tagline + 灰色斜纹 placeholder + `适合出行` badge。
 - 骨架态：`<Skeleton.Image>` 占 hero 位；`<Skeleton.Input size="small">` 代 breadcrumb；`<Skeleton paragraph={{ rows: 1 }}>` 代 tagline。
 
-#### 7.3.2 `WeatherCard.tsx`
+#### 7.3.4 `WeatherCard.tsx`
 
 - props：`{ data?: WeatherSnapshot; summary?: string; loading?: boolean }`
+- 外层使用 `CardContainer`，内部再分为现场块、7 日预报网格、summary 区域。
 - 数据态：现场块（温度、状况、湿度、风向 + 等级、能见度 + `<i className="qi qi-{iconCode}">` 大图）+ 7 日格子（日期、小 `qi` icon、`tMax / tMin`、`precipMm > 0` 显示"中雨"）+ `summary` 段（可缺省）。
 - 骨架态：现场块用 `Skeleton.Avatar` + 两行 `Skeleton`；7 日格子用 7 个相同大小的灰色方块占位。
 - `summary` 独立判断：`data` 已到但 `summary` 未到时仍显示完整天气卡，`summary` 区域显示一行 loading。
 
-#### 7.3.3 `AttractionList.tsx`
+#### 7.3.5 `AttractionList.tsx`
 
 - props：`{ items?: Attraction[]; loading?: boolean; placeholderCount?: number }`（默认 5）
+- 外层使用 `CardContainer`，列表行本身不再单独加外层阴影卡片。
 - 数据态：行布局——`imageUrl` 缩略（无则斜纹 placeholder）、名字 + category tag、description（可缺省）、右侧 ★ rating 和 `distanceKm`。
 - 骨架态：渲染 `placeholderCount` 个行级骨架（缩略图 + 两行文本）。
 
-#### 7.3.4 `RecommendationPanel.tsx`
+#### 7.3.6 `RecommendationPanel.tsx`
 
 - props：`{ data?: TripCard['recommendation']; chips?: string[]; loading?: boolean; onChipClick: (text: string) => void }`
+- 外层使用 `CardContainer`，黑色 pill tag 只作为内容元素，不替代卡片容器本身。
 - 数据态：黑色 pill tag + headline + body + 下方 chip 按钮行（4 枚）。
 - 骨架态：pill + 两行 `Skeleton` + 4 个等宽 chip 占位按钮（`disabled`）。
 
-#### 7.3.5 `TripCardView.tsx` — 组合器
+#### 7.3.7 `TripCardView.tsx` — 组合器
 
 - props：`{ weather?: WeatherSnapshot; attractions?: Attraction[]; card?: TripCard; onChipClick: (text: string) => void }`
 - 渲染顺序：`DestinationHero → WeatherCard → AttractionList → RecommendationPanel`。
+- `TripCardView` 只负责组合和传参，不直接创建新的视觉卡壳；卡片外观统一由各子组件内部的 `CardContainer` 提供。
 - 每个子卡片根据可用字段决定 `loading`：
 
   | 子卡片 | `loading` | 数据来源 |
@@ -361,6 +407,10 @@ Props：`TravelVerdict & { headline: string; followUps?: string[] }`
 
 `apps/web/src/chat/ChatPage.tsx`：
 
+- 空会话态：
+  - `messages.length === 0` 时，在 `ScrollArea` 顶部直接渲染 `<WelcomeCard onSuggestionClick={onRequest} />`。
+  - WelcomeCard 属于页面初始化内容，不写入 `messages`，首条用户消息发出后自然消失。
+
 - `roles.assistant.contentRender` 改为闭包（在组件内部构造，持有 `messageById` 索引，按 message id 查出 `weather / attractions / card`）。
 - 切换逻辑：
 
@@ -384,6 +434,8 @@ Props：`TravelVerdict & { headline: string; followUps?: string[] }`
 - `apps/web/src/main.tsx`（加载 `qweather-icons.css`）
 - `apps/web/src/chat/useTravelAgent.ts`（扩 state + 事件处理）
 - `apps/web/src/chat/ChatPage.tsx`（`contentRender` 切换 + chip 回调）
+- `apps/web/src/chat/cards/CardContainer.tsx`（**新建**）
+- `apps/web/src/chat/cards/WelcomeCard.tsx`（**新建**）
 - `apps/web/src/chat/cards/DestinationHero.tsx`（**新建**）
 - `apps/web/src/chat/cards/WeatherCard.tsx`（**新建**）
 - `apps/web/src/chat/cards/AttractionList.tsx`（**新建**）
@@ -407,3 +459,4 @@ Props：`TravelVerdict & { headline: string; followUps?: string[] }`
 6. 关闭页面中途 → server 日志「客户端连接已断开」，不应 emit `card`。
 7. 字体加载：Network 面板确认 `qweather-icons.woff2` 成功加载；无 code 缺失时 fallback 到 `qi-999`。
 8. `pnpm --filter @travel/web build` 通过 TS 校验。
+9. 新开页面且尚未发送消息时，ScrollArea 顶部展示 WelcomeCard，视觉结构与参考图一致：欢迎文案 + 三列能力面板 + 虚线分隔 + 底部引导语。
