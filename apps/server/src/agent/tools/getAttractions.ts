@@ -5,10 +5,12 @@
 //   - `extensions=all` 弃用，改成按需的 `show_fields=business,photos`
 //   - 评分字段从 `biz_ext.rating` 迁到 `business.rating`
 // 提供两种查询策略：先按 region 精确查，拿不到再用 "地名+景点" 关键字全国兜底。
+// distanceKm：关键字搜索本身不返回 `distance`，需要用 QWeather 拿到的城市中心与 POI 坐标做 haversine。
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
 import type { Attraction } from "@travel/shared";
 import { env } from "../../env.js";
+import { lookupQWeatherCity } from "./qweatherGeo.js";
 
 /** 高德"搜索 POI 2.0"返回的单条 POI。只列我们当前用到的字段，其余按需再补。 */
 interface AmapPoi {
@@ -43,20 +45,68 @@ const inputSchema = z.object({
 });
 
 /**
- * 把高德原始 POI 精简成前端和模型能直接消费的 Attraction 结构。
- * 只取前 8 条，超出没必要展示；rating 为 NaN（常见于 business 缺失）时置 undefined。
+ * 两点经纬度的 haversine 距离（km），6 位坐标精度下误差可忽略。
+ * 用于把高德 POI 坐标折算成相对城市中心的距离，补足 Amap 关键字搜索不返回 distance 的问题。
  */
-function toAttractions(pois: AmapPoi[] = []): Attraction[] {
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** 把高德 POI 的 "lng,lat" 字符串解析成数值对；缺失或格式非法返回 undefined。 */
+function parsePoiLocation(raw?: string): { lat: number; lon: number } | undefined {
+  if (!raw) return undefined;
+  const [lonStr, latStr] = raw.split(",");
+  const lon = Number(lonStr);
+  const lat = Number(latStr);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return undefined;
+  return { lat, lon };
+}
+
+/**
+ * 把高德原始 POI 精简成前端和模型能直接消费的 Attraction 结构。
+ * 只取前 8 条，超出没必要展示。
+ * @param pois 高德返回的原始 POI 列表
+ * @param cityCenter 可选的城市中心坐标；提供时会补 distanceKm
+ */
+function toAttractions(
+  pois: AmapPoi[] = [],
+  cityCenter?: { lat: number; lon: number },
+): Attraction[] {
   return pois.slice(0, 8).map((poi) => {
     const ratingRaw = poi.business?.rating;
     const rating = ratingRaw ? Number(ratingRaw) : undefined;
 
+    // 高德的 type 是多级分号分隔，如 "风景名胜;风景名胜;公园"。
+    const tags =
+      poi.type
+        ?.split(";")
+        .map((t) => t.trim())
+        .filter(Boolean) ?? [];
+
+    const poiCoord = parsePoiLocation(poi.location);
+    const distanceKm =
+      cityCenter && poiCoord
+        ? Math.round(haversineKm(cityCenter.lat, cityCenter.lon, poiCoord.lat, poiCoord.lon) * 10) /
+          10
+        : undefined;
+
+    const imageUrl = poi.photos?.find((p) => p.url)?.url;
+
     return {
       name: poi.name,
       address: poi.address?.trim() || undefined,
-      // 高德的 type 是多级分号分隔，如 "风景名胜;风景名胜;公园"；只取最顶层。
-      category: poi.type?.split(";")[0]?.trim() || "景点",
+      category: tags[0] || "景点",
       rating: Number.isFinite(rating) ? rating : undefined,
+      distanceKm,
+      imageUrl,
+      tags: tags.length > 0 ? tags : undefined,
     };
   });
 }
@@ -85,7 +135,7 @@ async function fetchAmap(url: URL): Promise<AmapPoi[]> {
 /**
  * 首选策略：用 `region` + `city_limit=true` 严格限定在给定地区内搜"景点"。
  * types=110000 是高德的"旅游景点"一级分类编码。
- * show_fields=business 让返回包含 business.rating，供前端展示评分。
+ * show_fields=business,photos 让返回包含 business.rating（评分）+ photos（图片）。
  */
 async function queryAttractionsByCity(location: string): Promise<AmapPoi[]> {
   const url = new URL("https://restapi.amap.com/v5/place/text");
@@ -95,7 +145,7 @@ async function queryAttractionsByCity(location: string): Promise<AmapPoi[]> {
   url.searchParams.set("city_limit", "true");
   url.searchParams.set("page_size", "8");
   url.searchParams.set("page_num", "1");
-  url.searchParams.set("show_fields", "business");
+  url.searchParams.set("show_fields", "business,photos");
   url.searchParams.set("key", env.AMAP_KEY);
   return fetchAmap(url);
 }
@@ -110,17 +160,37 @@ async function queryAttractionsFallback(location: string): Promise<AmapPoi[]> {
   url.searchParams.set("types", "110000");
   url.searchParams.set("page_size", "8");
   url.searchParams.set("page_num", "1");
-  url.searchParams.set("show_fields", "business");
+  url.searchParams.set("show_fields", "business,photos");
   url.searchParams.set("key", env.AMAP_KEY);
   return fetchAmap(url);
 }
 
+/**
+ * 查询城市中心坐标。这里故意不复用 getWeather 的结果：两个工具在 Agent 里可能并行触发，
+ * 相互等待会白白拉长首屏；qweatherFetch 内部 token 有 15min 缓存，这次多调一次成本可以忽略。
+ * 查询失败（如 QWeather key 丢失）时返回 undefined，下游的 distanceKm 会缺失，但不影响整体输出。
+ */
+async function resolveCityCenter(
+  location: string,
+): Promise<{ lat: number; lon: number } | undefined> {
+  try {
+    const city = await lookupQWeatherCity(location);
+    return { lat: city.lat, lon: city.lon };
+  } catch {
+    return undefined;
+  }
+}
+
 export const getAttractionsTool = tool(
   async ({ location }) => {
+    // 并行：一边查景点，一边取城市中心坐标，用来算 distanceKm。
+    const [cityPois, cityCenter] = await Promise.all([
+      queryAttractionsByCity(location),
+      resolveCityCenter(location),
+    ]);
     // 先尝试精确的 region 查询，空集再降级为关键字兜底。
-    const cityPois = await queryAttractionsByCity(location);
     const pois = cityPois.length > 0 ? cityPois : await queryAttractionsFallback(location);
-    const attractions = toAttractions(pois);
+    const attractions = toAttractions(pois, cityCenter);
 
     if (attractions.length === 0) {
       throw new Error(`No attractions found for "${location}"`);

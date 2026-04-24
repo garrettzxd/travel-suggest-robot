@@ -5,23 +5,24 @@ import { z } from "zod";
 import type { WeatherSnapshot, WeatherDaily } from "@travel/shared";
 import { env } from "../../env.js";
 import { qweatherFetch } from "./qweatherAuth.js";
+import { lookupQWeatherCity } from "./qweatherGeo.js";
 
-interface GeoCity {
-  id: string;
-  name: string;
-  lat: string;
-  lon: string;
-}
-
+/** QWeather v7/weather/now 响应体，只列本工具读取的字段。 */
 interface QWeatherNowResp {
   code: string;
   now: {
     temp: string;
     text: string;
     windSpeed: string;
+    humidity: string;
+    windDir: string;
+    windScale: string;
+    vis: string;
+    icon: string;
   };
 }
 
+/** QWeather v7/weather/7d 响应体，只列本工具读取的字段。 */
 interface QWeatherDailyResp {
   code: string;
   daily: Array<{
@@ -31,34 +32,24 @@ interface QWeatherDailyResp {
     textDay: string;
     precip: string;
     windSpeedDay: string;
+    iconDay: string;
   }>;
-}
-
-interface QWeatherGeoResp {
-  code: string;
-  location?: GeoCity[];
 }
 
 const inputSchema = z.object({
   location: z.string().min(1).describe("城市或地区名称，例如 '成都' 或 'Chengdu'"),
 });
 
+/**
+ * 查询指定城市的实时天气与未来 7 日预报（和风天气 QWeather）。
+ * 返回 {@link WeatherSnapshot}；数值字段统一归一到 number，icon 保留为原始字符串编码。
+ */
 export const getWeatherTool = tool(
   async ({ location }) => {
     const host = env.QWEATHER_API_HOST;
 
     // 第一步：地名 → 城市。QWeather 不接受生中文直接查天气，必须先拿到 city.id。
-    const geoUrl = `https://${host}/geo/v2/city/lookup?location=${encodeURIComponent(location)}`;
-    const geoRes = await qweatherFetch(geoUrl);
-    const geoJson = (await geoRes.json()) as QWeatherGeoResp;
-
-    const city = geoJson.location?.[0];
-    if (!city) {
-      // 把 QWeather 的 code 回显到错误信息里，便于对照官方错误码表排查。
-      throw new Error(`QWeather geo lookup failed for "${location}" (code=${geoJson.code})`);
-    }
-    const lat = Number(city.lat);
-    const lon = Number(city.lon);
+    const city = await lookupQWeatherCity(location);
 
     // 第二步：实时天气 + 未来 7 日并行拉。QWeather 这两个接口互不依赖，串行只是白等。
     const nowUrl = `https://${host}/v7/weather/now?location=${city.id}`;
@@ -77,16 +68,22 @@ export const getWeatherTool = tool(
       tMaxC: Number(d.tempMax),
       condition: d.textDay,
       precipMm: Number(d.precip),
+      iconCode: d.iconDay,
     }));
 
     const snapshot: WeatherSnapshot = {
       location: city.name,
-      lat,
-      lon,
+      lat: city.lat,
+      lon: city.lon,
       current: {
         tempC: Number(nowJson.now.temp),
         condition: nowJson.now.text,
         windKph: Number(nowJson.now.windSpeed),
+        humidityPct: Number(nowJson.now.humidity),
+        windDir: nowJson.now.windDir,
+        windScale: nowJson.now.windScale,
+        visibilityKm: Number(nowJson.now.vis),
+        iconCode: nowJson.now.icon,
       },
       daily,
     };

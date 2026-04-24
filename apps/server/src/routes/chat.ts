@@ -3,8 +3,16 @@
 // 工具开始结束事件翻译成前端约定的 SSE 事件。断连 / 异常 / 正常结束三条路径都要收尾。
 import { PassThrough } from "node:stream";
 import type { Context } from "koa";
-import type { ChatMessage, ChatRequest, ToolName } from "@travel/shared";
+import type {
+  Attraction,
+  ChatMessage,
+  ChatRequest,
+  ToolName,
+  TripCard,
+  WeatherSnapshot,
+} from "@travel/shared";
 import { agent } from "../agent/graph.js";
+import type { FinalizeTripCardInput } from "../agent/tools/finalizeTripCard.js";
 import { writeEvent } from "../utils/sse.js";
 import {
   createChatLogger,
@@ -118,12 +126,63 @@ function normalizeToolPayload(value: unknown): unknown {
 function toolLabel(name: ToolName): string {
   if (name === "getWeather") return "天气工具";
   if (name === "getAttractions") return "景点工具";
+  if (name === "finalizeTripCard") return "行程卡合并";
   return name;
 }
 
-/** 类型守卫：LangChain 事件里的 name 是裸 string，先收窄到已知工具再处理。 */
-function isToolName(name: string): name is ToolName {
+/**
+ * 类型守卫：仅匹配会对外下发 tool_start / tool_end 的公开工具名。
+ * finalizeTripCard 是内部工具，由 chat 路由合并后 emit 'card' 事件，不走这条分支。
+ */
+function isPublicToolName(name: string): name is "getWeather" | "getAttractions" {
   return name === "getWeather" || name === "getAttractions";
+}
+
+/**
+ * 把 finalize narrative + weather + attractions 合并成一张 TripCard。
+ * - description / summary / chips / recommendation 全部来自 finalize；
+ * - 地点 hero 的 city 从 weather.location 取，不再信任 LLM 重复；
+ * - attractions 数量不一致时以 attractions 为主，description 按索引补齐，越界的保留原值。
+ */
+function buildTripCard(
+  finalize: FinalizeTripCardInput,
+  weather: WeatherSnapshot,
+  attractions: Attraction[],
+): TripCard {
+  const mergedAttractions = attractions.map((attraction, index) => {
+    const description = finalize.attractions[index]?.description;
+    return description ? { ...attraction, description } : attraction;
+  });
+
+  return {
+    hero: {
+      regionCode: finalize.hero.regionCode,
+      regionPath: finalize.hero.regionPath,
+      city: weather.location,
+      tagline: finalize.hero.tagline,
+      verdictBadge: finalize.hero.verdictBadge,
+    },
+    weather: { ...weather, summary: finalize.weather.summary },
+    attractions: mergedAttractions,
+    recommendation: finalize.recommendation,
+    chips: finalize.chips,
+  };
+}
+
+/**
+ * finalize 工具 result 做 runtime 宽松校验：Zod 已经在工具内部校过一遍，
+ * 这里只防御 "工具抛错 → result 变成错误字符串" 的情况。
+ */
+function isFinalizeInput(value: unknown): value is FinalizeTripCardInput {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<FinalizeTripCardInput>;
+  return (
+    !!candidate.hero &&
+    !!candidate.weather &&
+    Array.isArray(candidate.attractions) &&
+    !!candidate.recommendation &&
+    Array.isArray(candidate.chips)
+  );
 }
 
 /**
@@ -173,7 +232,7 @@ function emitToolStarts(
 
       for (const [index, toolCall] of toolCalls.entries()) {
         const name = toolCall.name as ToolName | undefined;
-        if (!name) continue;
+        if (!name || !isPublicToolName(name)) continue;
 
         const toolCallId = toolCall.id ?? `${name}-${index}`;
         if (startedToolCalls.has(toolCallId)) {
@@ -223,7 +282,7 @@ function emitToolEnds(
 
     for (const [index, message] of messages.entries()) {
       const toolName = (message as { name?: string }).name as ToolName | undefined;
-      if (!toolName) {
+      if (!toolName || !isPublicToolName(toolName)) {
         continue;
       }
 
@@ -281,6 +340,9 @@ export async function chatRoute(ctx: Context): Promise<void> {
   const abortController = new AbortController();
   const startedToolCalls = new Set<string>();
   const completedToolCalls = new Set<string>();
+  // 缓存两个外部工具的裸结果，finalizeTripCard 收尾时用它们拼 TripCard。
+  let cachedWeather: WeatherSnapshot | undefined;
+  let cachedAttractions: Attraction[] | undefined;
   let sseEventCount = 0;
   let finalContent = "";
 
@@ -382,7 +444,15 @@ export async function chatRoute(ctx: Context): Promise<void> {
         continue;
       }
 
-      if (event.event === "on_tool_start" && isToolName(event.name)) {
+      if (event.event === "on_tool_start") {
+        // finalizeTripCard 是内部工具：不对外暴露 tool_start。
+        if (event.name === "finalizeTripCard") {
+          log.debug("内部工具启动（不下发）", { toolName: event.name, runId: event.run_id });
+          continue;
+        }
+        if (!isPublicToolName(event.name)) {
+          continue;
+        }
         if (startedToolCalls.has(event.run_id)) {
           continue;
         }
@@ -401,13 +471,62 @@ export async function chatRoute(ctx: Context): Promise<void> {
         continue;
       }
 
-      if (event.event === "on_tool_end" && isToolName(event.name)) {
+      if (event.event === "on_tool_end") {
+        // finalizeTripCard 结束时：合并 weather + attractions + narrative，emit 'card'。
+        if (event.name === "finalizeTripCard") {
+          if (completedToolCalls.has(event.run_id)) {
+            continue;
+          }
+          completedToolCalls.add(event.run_id);
+
+          const finalize = extractToolResult(event.data?.output);
+          if (!isFinalizeInput(finalize)) {
+            log.warn("finalizeTripCard 返回体不合法，跳过 card 合并", {
+              runId: event.run_id,
+              preview: previewJson(finalize),
+            });
+            continue;
+          }
+          if (!cachedWeather || !cachedAttractions) {
+            log.warn("缺少前置工具数据，无法合并 TripCard", {
+              hasWeather: !!cachedWeather,
+              hasAttractions: !!cachedAttractions,
+            });
+            continue;
+          }
+
+          const card = buildTripCard(finalize, cachedWeather, cachedAttractions);
+          log.toolResult(toolLabel("finalizeTripCard"), {
+            toolCallId: event.run_id,
+            toolName: "finalizeTripCard",
+            resultPreview: previewJson({
+              city: card.hero.city,
+              verdict: card.hero.verdictBadge,
+              attractions: card.attractions.length,
+              chips: card.chips.length,
+            }),
+          });
+          emitEvent("card", { card });
+          continue;
+        }
+
+        if (!isPublicToolName(event.name)) {
+          continue;
+        }
         if (completedToolCalls.has(event.run_id)) {
           continue;
         }
 
         completedToolCalls.add(event.run_id);
         const result = extractToolResult(event.data?.output);
+
+        // 缓存供 finalizeTripCard 合并时复用；解析失败（如工具抛错导致 result 变成字符串）则不缓存。
+        if (event.name === "getWeather" && result && typeof result === "object") {
+          cachedWeather = result as WeatherSnapshot;
+        } else if (event.name === "getAttractions" && Array.isArray(result)) {
+          cachedAttractions = result as Attraction[];
+        }
+
         log.toolResult(toolLabel(event.name), {
           toolCallId: event.run_id,
           toolName: event.name,

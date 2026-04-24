@@ -40,7 +40,11 @@
       "Bash(git init *)",
       "Bash(git remote *)",
       "Bash(git branch *)",
-      "Bash(git symbolic-ref *)"
+      "Bash(git symbolic-ref *)",
+      "Bash(pnpm -r typecheck)",
+      "Bash(pnpm --filter @travel/shared build)",
+      "Bash(pnpm --filter @travel/shared clean)",
+      "Bash(git add *)"
     ]
   }
 }
