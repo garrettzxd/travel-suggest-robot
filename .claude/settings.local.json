@@ -44,7 +44,13 @@
       "Bash(pnpm -r typecheck)",
       "Bash(pnpm --filter @travel/shared build)",
       "Bash(pnpm --filter @travel/shared clean)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr *)",
+      "Bash(command -v gh)",
+      "Bash(brew --prefix gh)",
+      "Bash(/usr/local/opt/gh/bin/gh --version)"
     ]
   }
 }
