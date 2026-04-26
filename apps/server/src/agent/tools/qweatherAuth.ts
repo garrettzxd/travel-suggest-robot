@@ -11,6 +11,21 @@ const REFRESH_SKEW_SECONDS = 60;
 
 let cachedKey: KeyLike | null = null;
 let cachedToken: { value: string; expiresAt: number } | null = null;
+// 进程生命周期内只打印一次"鉴权配置"诊断日志，避免刷屏。
+let diagnosticsPrinted = false;
+
+/**
+ * 仅做一次的鉴权配置自检：把 kid / sub / API host / JWT 前缀打到 stderr。
+ * 任何一项明显不对（kid 与 sub 互换、host 还是 api.qweather.com 等）一眼能看出来。
+ * 不打全 JWT，避免日志泄露密钥。
+ */
+function printDiagnosticsOnce(token: string): void {
+  if (diagnosticsPrinted) return;
+  diagnosticsPrinted = true;
+  console.warn(
+    `[qweather-auth] JWT issued | host=${env.QWEATHER_API_HOST} kid=${env.QWEATHER_KEY_ID} sub=${env.QWEATHER_PROJECT_ID} jwt=${token.slice(0, 24)}...`,
+  );
+}
 
 /** 读取并缓存 PKCS8 PEM 私钥；首次用 jose 导入成 KeyLike，后续复用。 */
 async function loadPrivateKey(): Promise<KeyLike> {
@@ -43,6 +58,7 @@ export async function getQWeatherToken(): Promise<string> {
     .sign(key);
 
   cachedToken = { value, expiresAt: exp };
+  printDiagnosticsOnce(value);
   return value;
 }
 

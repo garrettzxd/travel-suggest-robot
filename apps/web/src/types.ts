@@ -7,4 +7,5 @@ export type {
   WeatherDaily,
   WeatherSnapshot,
   TravelVerdict,
+  TripCard,
 } from '@travel/shared';

@@ -7,12 +7,12 @@
     "node": ">=24"
   },
   "scripts": {
-    "dev": "pnpm -r --parallel --filter @travel/server --filter @travel/web dev",
+    "dev": "pnpm build:shared && pnpm -r --parallel --filter @travel/server --filter @travel/web dev",
     "build:shared": "pnpm --filter @travel/shared build",
     "build:server": "pnpm --filter @travel/server build",
     "build:web": "pnpm --filter @travel/web build",
-    "dev:server": "pnpm --filter @travel/server dev",
-    "dev:web": "pnpm --filter @travel/web dev",
+    "dev:server": "pnpm build:shared && pnpm --filter @travel/server dev",
+    "dev:web": "pnpm build:shared && pnpm --filter @travel/web dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "clean": "pnpm -r exec rm -rf dist"

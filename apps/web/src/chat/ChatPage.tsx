@@ -1,20 +1,24 @@
-import { useEffect, useState } from 'react';
-import { Bubble, Sender, ThoughtChain } from '@ant-design/x';
-import type { BubbleProps, ThoughtChainItemType } from '@ant-design/x';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Bubble } from '@ant-design/x';
+import type { BubbleProps } from '@ant-design/x';
 import XMarkdown from '@ant-design/x-markdown';
 import { Typography } from 'antd';
-import { useTravelAgent, type ToolTraceEntry } from './useTravelAgent';
+import { TopBar } from './TopBar';
+import { InputBar } from './InputBar';
+import { WelcomeCard } from './cards/WelcomeCard';
+import { TripCardView } from './cards/TripCardView';
+import { useTravelAgent, type TravelChatMessage } from './useTravelAgent';
+import { colors, layout, radius, spacing } from '../theme/tokens';
 
 const TYPING_STEP = 2;
 const TYPING_INTERVAL = 30;
 
-// MarkdownTyping 负责把 assistant 的 Markdown 内容按字符逐步展示。
+/** MarkdownTyping：作为"无结构化数据"场景的兜底，按字符逐步展示。 */
 function MarkdownTyping({ content }: { content: string }) {
   const [visible, setVisible] = useState(0);
 
   useEffect(() => {
     if (visible >= content.length) return;
-    // 用定时器模拟打字效果，避免一次性渲染大段回复。
     const timer = setTimeout(() => {
       setVisible((v) => Math.min(content.length, v + TYPING_STEP));
     }, TYPING_INTERVAL);
@@ -29,63 +33,107 @@ function MarkdownTyping({ content }: { content: string }) {
   );
 }
 
-// Bubble 的 contentRender 入口，把原始文本交给 Markdown 打字组件处理。
+/** Bubble 通用渲染，传给 fallback markdown 气泡 / 错误气泡使用。 */
 const renderMarkdown: BubbleProps['contentRender'] = (content) => (
   <MarkdownTyping content={typeof content === 'string' ? content : String(content ?? '')} />
 );
 
-const roles = {
-  user: {
-    placement: 'end' as const,
-    variant: 'filled' as const,
-  },
-  assistant: {
-    placement: 'start' as const,
-    variant: 'outlined' as const,
-    contentRender: renderMarkdown,
-  },
-};
-
-const toolLabels: Record<string, string> = {
-  getWeather: '查询天气中',
-  getAttractions: '搜索景点中',
-};
-
-// 将工具调用轨迹转换为 ThoughtChain 可以识别的节点状态。
-function traceToThoughtItems(trace: ToolTraceEntry[]): ThoughtChainItemType[] {
-  return trace.map((entry, idx) => ({
-    key: `${entry.name}-${idx}`,
-    title: toolLabels[entry.name] ?? entry.name,
-    status:
-      entry.status === 'running' ? 'loading' : entry.status === 'done' ? 'success' : 'error',
-  }));
+/**
+ * 用户气泡：深墨色底 + 白字，右对齐。直接输出原始文本，不做 Markdown 解析。
+ * 这里手写一个简化版，避免 Bubble 默认样式带来的灰色边和气泡尾巴。
+ */
+function UserBubble({ content }: { content: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      <div
+        style={{
+          background: colors.userBubble,
+          color: colors.surface,
+          padding: '10px 14px',
+          borderRadius: 14,
+          maxWidth: '70%',
+          fontSize: 14,
+          lineHeight: 1.6,
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+        }}
+      >
+        {content}
+      </div>
+    </div>
+  );
 }
 
-// ChatPage 负责聊天消息布局、输入框状态和工具调用进度展示。
+/** assistant 顶部信息行：圆形头像 + "漫游助手" 名 + 创建时间。 */
+function AssistantHeader({ time }: { time: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
+      <div
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: '50%',
+          background: colors.ink,
+          color: colors.surface,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: 14,
+          fontWeight: 700,
+        }}
+      >
+        漫
+      </div>
+      <span style={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>漫游助手</span>
+      <span style={{ fontSize: 12, color: colors.inkMuted }}>{time}</span>
+    </div>
+  );
+}
+
+/** 把消息 id 中的时间戳还原为 Date，用作 assistant header 的小时分钟显示。 */
+function deriveMessageTime(id: string): string {
+  const ts = Number(id.split('-')[1]);
+  const date = Number.isFinite(ts) ? new Date(ts) : new Date();
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+/** 取首条 user 消息前 16 字 + 后缀，作为 TopBar 标题；空会话则给默认值。 */
+function deriveTitle(messages: TravelChatMessage[]): string {
+  const firstUser = messages.find((m) => m.role === 'user');
+  if (!firstUser || !firstUser.content) return '漫游 · 旅行建议';
+  const head = firstUser.content.slice(0, 16);
+  return head.length < firstUser.content.length ? `${head}…` : head;
+}
+
+/**
+ * ChatPage 路由层：根据 assistant 消息上是否带 weather/attractions/card 决定渲染
+ * TripCardView 还是 MarkdownTyping。空会话顶部展示 WelcomeCard。
+ */
 export default function ChatPage() {
-  const { messages, onRequest, toolTrace, isRequesting } = useTravelAgent();
+  const { messages, onRequest, isRequesting } = useTravelAgent();
   const [inputValue, setInputValue] = useState('');
-  const pendingAssistantId = messages.findLast(
-    (message) => message.role === 'assistant' && message.status !== 'success',
-  )?.id;
+  const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const items = messages.map(({ id, role, content, status }) => ({
-    key: id,
-    role,
-    content: content || (status === 'loading' ? '正在思考中...' : ''),
-    loading: status === 'loading',
-    status,
-    streaming: id === pendingAssistantId && status === 'updating',
-  }));
+  // 新消息进来时自动滚到底部，避免用户错过流式更新。
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages]);
 
-  const thoughtItems = traceToThoughtItems(toolTrace);
+  const lastUpdatedAt = useMemo(() => {
+    const last = messages[messages.length - 1];
+    if (!last) return new Date();
+    const ts = Number(last.id.split('-')[1]);
+    return Number.isFinite(ts) ? new Date(ts) : new Date();
+  }, [messages]);
 
-  // 提交后立刻清空输入框，请求生命周期交给 useTravelAgent 管理。
+  /** 提交后立刻清空输入框，请求生命周期交给 useTravelAgent 管理。 */
   const handleSubmit = (value: string) => {
-    const message = value.trim();
-    if (!message) return;
+    const text = value.trim();
+    if (!text) return;
     setInputValue('');
-    onRequest(message);
+    onRequest(text);
   };
 
   return (
@@ -95,31 +143,145 @@ export default function ChatPage() {
         width: '100vw',
         display: 'flex',
         flexDirection: 'column',
-        padding: 16,
-        gap: 12,
-        maxWidth: 960,
-        margin: '0 auto',
+        background: colors.bg,
       }}
     >
-      <Typography.Title level={3} style={{ margin: 0 }}>
-        旅行建议机器人
-      </Typography.Title>
+      <TopBar
+        title={deriveTitle(messages)}
+        messageCount={messages.length}
+        updatedAt={lastUpdatedAt}
+        online
+      />
 
-      <div style={{ flex: 1, overflow: 'auto', paddingRight: 4 }}>
-        <Bubble.List role={roles} items={items} />
-        {isRequesting && thoughtItems.length > 0 && (
-          <div style={{ marginTop: 12, paddingLeft: 48 }}>
-            <ThoughtChain items={thoughtItems} />
-          </div>
-        )}
+      <div
+        ref={scrollRef}
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          paddingBottom: layout.inputBarPadBottom,
+        }}
+      >
+        <div
+          style={{
+            maxWidth: layout.contentMaxWidth,
+            margin: '0 auto',
+            padding: `${spacing.lg}px ${spacing.md}px 0`,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: spacing.lg,
+          }}
+        >
+          {messages.length === 0 ? (
+            <WelcomeCard onSuggestionClick={onRequest} />
+          ) : (
+            messages.map((message) => (
+              <MessageRow
+                key={message.id}
+                message={message}
+                onChipClick={onRequest}
+              />
+            ))
+          )}
+        </div>
       </div>
 
-      <Sender
+      <InputBar
         value={inputValue}
         onChange={setInputValue}
         onSubmit={handleSubmit}
         loading={isRequesting}
-        placeholder="输入目的地，例如：我想去成都"
+      />
+    </div>
+  );
+}
+
+/**
+ * 单条消息分发：user → UserBubble；assistant 视数据可用性走 TripCardView 或 markdown 兜底。
+ * 切换条件遵循 PRD §7.5：
+ *   - loading 且未收到任何 tool_start → "正在思考中..."
+ *   - 已收到 tool_start，或已有任何结构化数据 → TripCardView（按可用字段升级）
+ *   - 走完未拿到任何结构化数据 → MarkdownTyping fallback
+ *   - error → 错误气泡
+ */
+function MessageRow({
+  message,
+  onChipClick,
+}: {
+  message: TravelChatMessage;
+  onChipClick: (text: string) => void;
+}) {
+  if (message.role === 'user') {
+    return <UserBubble content={message.content} />;
+  }
+
+  const time = deriveMessageTime(message.id);
+  const hasStructured = !!(message.weather || message.attractions || message.card);
+
+  // error：使用红色 Bubble 单独展示。
+  if (message.status === 'error') {
+    return (
+      <div>
+        <AssistantHeader time={time} />
+        <Bubble
+          placement="start"
+          variant="outlined"
+          content={message.content || '请求失败'}
+          contentRender={renderMarkdown}
+          styles={{
+            content: {
+              background: colors.avoidSoft,
+              color: colors.avoid,
+              borderRadius: radius.card,
+            },
+          }}
+        />
+      </div>
+    );
+  }
+
+  // loading：无任何工具触发，显示纯文本提示（首次 token / final 到达后会切换形态）。
+  if (message.status === 'loading' && !hasStructured && !message.hasToolStart) {
+    return (
+      <div>
+        <AssistantHeader time={time} />
+        <Bubble
+          placement="start"
+          variant="outlined"
+          loading
+          content=""
+        />
+      </div>
+    );
+  }
+
+  // 进入卡片流：要么已经收到 tool_start，要么已经有结构化字段。
+  // settled 在 status 已经收口（success；error 已经在上面分支提前 return）时为 true，
+  // 子卡据此把骨架切静态空态，停止永远转的骨架动画。
+  if (message.hasToolStart || hasStructured) {
+    const settled = message.status === 'success';
+    return (
+      <div>
+        <AssistantHeader time={time} />
+        <TripCardView
+          weather={message.weather}
+          attractions={message.attractions}
+          card={message.card}
+          settled={settled}
+          onChipClick={onChipClick}
+        />
+      </div>
+    );
+  }
+
+  // 兜底：纯 markdown 文本回复（闲聊 / 拒绝）。
+  return (
+    <div>
+      <AssistantHeader time={time} />
+      <Bubble
+        placement="start"
+        variant="outlined"
+        content={message.content}
+        contentRender={renderMarkdown}
       />
     </div>
   );

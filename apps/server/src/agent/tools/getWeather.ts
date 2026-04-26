@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { WeatherSnapshot, WeatherDaily } from "@travel/shared";
 import { env } from "../../env.js";
 import { qweatherFetch } from "./qweatherAuth.js";
-import { lookupQWeatherCity } from "./qweatherGeo.js";
+import { explainQWeatherCode, lookupQWeatherCity } from "./qweatherGeo.js";
 
 /** QWeather v7/weather/now 响应体，只列本工具读取的字段。 */
 interface QWeatherNowResp {
@@ -60,6 +60,19 @@ export const getWeatherTool = tool(
       QWeatherNowResp,
       QWeatherDailyResp,
     ];
+
+    // 必须先校验 QWeather 业务 code：401/402/403 都属于鉴权问题，
+    // 这里抛出的错误会沿 chat 路由的 error 事件下发到前端，便于一眼定位。
+    if (nowJson.code !== "200") {
+      throw new Error(
+        `QWeather /v7/weather/now failed (HTTP ${nowRes.status}, code=${nowJson.code}: ${explainQWeatherCode(nowJson.code)})`,
+      );
+    }
+    if (dailyJson.code !== "200") {
+      throw new Error(
+        `QWeather /v7/weather/7d failed (HTTP ${dailyRes.status}, code=${dailyJson.code}: ${explainQWeatherCode(dailyJson.code)})`,
+      );
+    }
 
     // QWeather 数值字段全是字符串，这里统一转 Number 让下游不用重复处理。
     const daily: WeatherDaily[] = dailyJson.daily.map((d) => ({

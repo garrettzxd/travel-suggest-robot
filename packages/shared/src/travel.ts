@@ -95,9 +95,18 @@ export interface TripCard {
     tagline: string;
     /** 出行评估枚举：good / caution / avoid */
     verdictBadge: string;
+    /**
+     * 顶图 URL。由 chat 路由从 attractions 第一张可用 photo 派生，
+     * 缺失时前端走斜纹占位（PLACEHOLDER）。
+     */
+    heroImageUrl?: string;
   };
-  /** 天气卡数据：裸 WeatherSnapshot 再加一段整体评估 summary */
-  weather: WeatherSnapshot & { summary: string };
+  /**
+   * 天气卡数据：裸 WeatherSnapshot 再加一段整体评估 summary。
+   * getWeather 工具失败时整段省略——前端据此展示"天气暂不可用"空态，
+   * 不影响 hero / attractions / recommendation 的渲染。
+   */
+  weather?: WeatherSnapshot & { summary: string };
   /** 景点列表，description 已由 finalizeTripCard 填充 */
   attractions: Attraction[];
   /** 出行建议面板文案 */

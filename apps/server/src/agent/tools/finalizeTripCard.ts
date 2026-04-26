@@ -40,14 +40,19 @@ const finalizeSchema = z.object({
       .enum(["good", "caution", "avoid"])
       .describe("整体出行评估：good=适合出行 / caution=谨慎出行 / avoid=不建议出行。"),
   }),
-  weather: z.object({
-    summary: z
-      .string()
-      .min(1)
-      .describe(
-        "未来一周天气整体评估，结合温度区间、降水与昼夜温差给出穿衣/装备建议，40–120 字。",
-      ),
-  }),
+  weather: z
+    .object({
+      summary: z
+        .string()
+        .min(1)
+        .describe(
+          "未来一周天气整体评估，结合温度区间、降水与昼夜温差给出穿衣/装备建议，40–120 字。",
+        ),
+    })
+    .optional()
+    .describe(
+      "getWeather 工具失败时省略整段；其余情况必须提供 summary。不要凭空编造天气数据。",
+    ),
   attractions: z
     .array(
       z.object({

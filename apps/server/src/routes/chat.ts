@@ -1,7 +1,6 @@
 // POST /api/chat 的 SSE 路由实现。
 // 职责：校验请求 → 初始化 SSE 响应流 → 驱动 LangGraph streamEvents → 把模型 token /
 // 工具开始结束事件翻译成前端约定的 SSE 事件。断连 / 异常 / 正常结束三条路径都要收尾。
-import { PassThrough } from "node:stream";
 import type { Context } from "koa";
 import type {
   Attraction,
@@ -42,16 +41,29 @@ interface LangChainStreamEvent {
 
 /**
  * 把前端历史消息拼成 LangGraph 能消费的 `{role, content}[]`，末尾附上本轮 user 输入。
- * 过滤空内容消息：空 assistant 会让 Moonshot 报 "unknown content type:"；
- * 历史里的占位消息（abort / 无 token 的 final）必须在这里丢掉。
+ *
+ * 处理两类边界情况：
+ * - 空 assistant content：前端有时会把"已完成的 TripCard 回合"合成 "[已为「xxx」生成行程卡]"
+ *   这种摘要发回来；但万一没合成（旧客户端 / 异常路径）就只剩 ""。直接发给 Moonshot
+ *   会报 "unknown content type:"，且模型也会以为上一轮没完成而重复调工具。
+ *   这里统一兜底成 "[此前一回合已完成，请勿重复调用相同工具]" 的占位。
+ * - user 空 content：当作真正的空消息丢掉（不会出现，但保留过滤防御）。
  */
 function historyToAgentMessages(history: ChatMessage[], message: string) {
   return [
     ...history
-      .filter((item) => typeof item.content === "string" && item.content.trim() !== "")
+      .filter((item) => {
+        if (typeof item.content !== "string") return false;
+        // user 端真正空消息丢掉；assistant 端空 content 会被下面替换成占位摘要，不丢。
+        if (item.role === "user" && item.content.trim() === "") return false;
+        return true;
+      })
       .map((item) => ({
         role: item.role,
-        content: item.content,
+        content:
+          item.role === "assistant" && item.content.trim() === ""
+            ? "[此前一回合已生成行程卡或完成处理，请勿为该地名重复调用工具。]"
+            : item.content,
       })),
     {
       role: "user" as const,
@@ -141,12 +153,13 @@ function isPublicToolName(name: string): name is "getWeather" | "getAttractions"
 /**
  * 把 finalize narrative + weather + attractions 合并成一张 TripCard。
  * - description / summary / chips / recommendation 全部来自 finalize；
- * - 地点 hero 的 city 从 weather.location 取，不再信任 LLM 重复；
+ * - hero.city 优先用 weather.location（已校准的官方城市名），weather 缺失时回退到空串（前端会用 hero.regionPath 兜底显示）。
+ * - weather 缺失时 card.weather 整段省略，前端 WeatherCard 切到"天气暂不可用"空态。
  * - attractions 数量不一致时以 attractions 为主，description 按索引补齐，越界的保留原值。
  */
 function buildTripCard(
   finalize: FinalizeTripCardInput,
-  weather: WeatherSnapshot,
+  weather: WeatherSnapshot | undefined,
   attractions: Attraction[],
 ): TripCard {
   const mergedAttractions = attractions.map((attraction, index) => {
@@ -154,15 +167,26 @@ function buildTripCard(
     return description ? { ...attraction, description } : attraction;
   });
 
+  // weather 仅在两端都齐时才落到 card.weather；任一缺失就整段省略。
+  const weatherBlock =
+    weather && finalize.weather?.summary
+      ? { ...weather, summary: finalize.weather.summary }
+      : undefined;
+
+  // 复用景点照片做城市 Hero 图：第一张带 imageUrl 的景点最有代表性，零额外 API 调用。
+  // 没有任何景点带图时省略 heroImageUrl，前端会走斜纹占位。
+  const heroImageUrl = mergedAttractions.find((a) => a.imageUrl)?.imageUrl;
+
   return {
     hero: {
       regionCode: finalize.hero.regionCode,
       regionPath: finalize.hero.regionPath,
-      city: weather.location,
+      city: weather?.location ?? "",
       tagline: finalize.hero.tagline,
       verdictBadge: finalize.hero.verdictBadge,
+      ...(heroImageUrl ? { heroImageUrl } : {}),
     },
-    weather: { ...weather, summary: finalize.weather.summary },
+    ...(weatherBlock ? { weather: weatherBlock } : {}),
     attractions: mergedAttractions,
     recommendation: finalize.recommendation,
     chips: finalize.chips,
@@ -172,13 +196,13 @@ function buildTripCard(
 /**
  * finalize 工具 result 做 runtime 宽松校验：Zod 已经在工具内部校过一遍，
  * 这里只防御 "工具抛错 → result 变成错误字符串" 的情况。
+ * weather 字段允许缺失（getWeather 失败的兜底路径）。
  */
 function isFinalizeInput(value: unknown): value is FinalizeTripCardInput {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<FinalizeTripCardInput>;
   return (
     !!candidate.hero &&
-    !!candidate.weather &&
     Array.isArray(candidate.attractions) &&
     !!candidate.recommendation &&
     Array.isArray(candidate.chips)
@@ -336,10 +360,17 @@ export async function chatRoute(ctx: Context): Promise<void> {
   }
 
   const input: ChatRequest = parsed.data;
-  const stream = new PassThrough();
   const abortController = new AbortController();
   const startedToolCalls = new Set<string>();
   const completedToolCalls = new Set<string>();
+  // 单轮内每个公开工具最多 emit 一次，防 LLM 抽风时并行调多次同名工具污染前端状态。
+  // 例如把上一轮的"上海"和当前"北京"同时发起，前端会基于"最后一次"覆盖，结果数据互相穿插。
+  // 只放过第一个 tool_start / tool_end，后续重复 emit 跳过；finalizeTripCard 同理只下发第一张 card。
+  const emittedPublicTools = new Set<ToolName>();
+  // start 阶段成功 emit 的 run_id；end 阶段以此判断是否要落 cache + emit tool_end。
+  // 被 dedup 抑制的 start 对应的 end 也必须丢弃，否则 cache 会被第二次工具结果覆盖。
+  const emittedToolStartRunIds = new Set<string>();
+  let cardEmitted = false;
   // 缓存两个外部工具的裸结果，finalizeTripCard 收尾时用它们拼 TripCard。
   let cachedWeather: WeatherSnapshot | undefined;
   let cachedAttractions: Attraction[] | undefined;
@@ -348,29 +379,37 @@ export async function chatRoute(ctx: Context): Promise<void> {
 
   log.request(previewText(input.message));
 
-  ctx.status = 200;
-  ctx.set({
-    "Content-Type": "text/event-stream; charset=utf-8",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-    "X-Accel-Buffering": "no",
-  });
-  ctx.body = stream;
-  ctx.respond = true;
-  ctx.res.flushHeaders?.();
+  // SSE 响应必须绕过 Koa 的 body 管线（不再走 PassThrough → ctx.body 那条路径）：
+  // 1) 多一层 PassThrough → pipe(ctx.res) 会把每帧塞进流的内部 buffer，时机不可控；
+  // 2) Koa 默认 ctx.respond=true 时会等到处理结束才正确收尾，对长流不友好。
+  // 因此这里 ctx.respond=false 自己接管 ctx.res，每帧 emit 后直接走 res.write。
+  ctx.respond = false;
+  ctx.res.statusCode = 200;
+  ctx.res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  ctx.res.setHeader("Cache-Control", "no-cache");
+  ctx.res.setHeader("Connection", "keep-alive");
+  // Nginx 之类的反向代理会按 X-Accel-Buffering: no 关掉缓冲；不影响本机 dev。
+  ctx.res.setHeader("X-Accel-Buffering", "no");
+  ctx.res.flushHeaders();
+  // 关键修复：关闭响应 socket 上的 Nagle 算法。
+  // Node TCP 默认 Nagle 开启（TCP_NODELAY=false），会把多次小写攒成 ~200ms 一个包再下发；
+  // 对 SSE 这种"一帧一帧逐次推送"的场景就是灾难——所有事件会被打包到同一个 TCP 包里，
+  // 浏览器 DevTools EventStream 看到的就是所有事件时间戳完全相同（ALL 同一毫秒）。
+  // setNoDelay(true) 让每个 res.write 立即下发到 socket，事件之间的真实时间差才能体现。
+  ctx.res.socket?.setNoDelay(true);
 
   const emitEvent: EventWriter = (event, data) => {
-    if (stream.destroyed || stream.writableEnded) {
+    if (ctx.res.writableEnded || ctx.res.destroyed) {
       log.warn("SSE 流已关闭，跳过事件推送", {
         event,
-        streamDestroyed: stream.destroyed,
-        streamWritableEnded: stream.writableEnded,
+        responseDestroyed: ctx.res.destroyed,
+        responseWritableEnded: ctx.res.writableEnded,
       });
       return;
     }
 
     sseEventCount += 1;
-    const writable = writeEvent(stream, event, data);
+    const writable = writeEvent(ctx.res, event, data);
     log.trace("SSE 事件已写入", { event, writable, sseEventCount });
   };
 
@@ -394,7 +433,9 @@ export async function chatRoute(ctx: Context): Promise<void> {
       aborted: abortController.signal.aborted,
     });
     abortController.abort();
-    stream.end();
+    if (!ctx.res.writableEnded) {
+      ctx.res.end();
+    }
   };
 
   ctx.req.on("close", onRequestClose);
@@ -420,7 +461,7 @@ export async function chatRoute(ctx: Context): Promise<void> {
     log.debug("LLM 流式响应已建立");
 
     for await (const event of agentStream as AsyncIterable<LangChainStreamEvent>) {
-      log.debug('流输出', JSON.stringify(event));
+      // log.debug('流输出', JSON.stringify(event));
       if (abortController.signal.aborted) {
         log.warn("聊天流程已被中止", {
           durationMs: Date.now() - startedAt,
@@ -456,8 +497,20 @@ export async function chatRoute(ctx: Context): Promise<void> {
         if (startedToolCalls.has(event.run_id)) {
           continue;
         }
+        // 单轮内同名工具最多 emit 一次：LLM 偶尔会并行调多次（譬如混上历史地名），
+        // 第二次以后直接吞掉，避免前端基于"最后一次"覆盖、导致 weather/attractions 错位。
+        if (emittedPublicTools.has(event.name)) {
+          log.warn("同名工具在单轮内被重复触发，已忽略多余调用", {
+            toolName: event.name,
+            runId: event.run_id,
+          });
+          startedToolCalls.add(event.run_id);
+          continue;
+        }
 
         startedToolCalls.add(event.run_id);
+        emittedPublicTools.add(event.name);
+        emittedToolStartRunIds.add(event.run_id);
         const args = normalizeToolPayload(event.data?.input ?? {});
         log.toolCall(toolLabel(event.name), {
           toolCallId: event.run_id,
@@ -478,6 +531,14 @@ export async function chatRoute(ctx: Context): Promise<void> {
             continue;
           }
           completedToolCalls.add(event.run_id);
+          // 单轮只下发一张 card；LLM 重复调 finalize 时第二次起静默丢弃，
+          // 避免前端 card 状态被反复覆盖出现"地点是 A 但景点是 B"的错乱。
+          if (cardEmitted) {
+            log.warn("finalizeTripCard 在单轮内被重复触发，已忽略多余 card", {
+              runId: event.run_id,
+            });
+            continue;
+          }
 
           const finalize = extractToolResult(event.data?.output);
           if (!isFinalizeInput(finalize)) {
@@ -487,15 +548,20 @@ export async function chatRoute(ctx: Context): Promise<void> {
             });
             continue;
           }
-          if (!cachedWeather || !cachedAttractions) {
-            log.warn("缺少前置工具数据，无法合并 TripCard", {
+          if (!cachedAttractions) {
+            // attractions 是行程卡的最小必要数据；weather 缺失允许下发 card（前端 WeatherCard 自行降级到空态）。
+            log.warn("缺少 attractions 裸数据，无法合并 TripCard", {
               hasWeather: !!cachedWeather,
               hasAttractions: !!cachedAttractions,
             });
             continue;
           }
+          if (!cachedWeather) {
+            log.debug("getWeather 缺失，按降级模式合并 TripCard（card.weather 将省略）");
+          }
 
           const card = buildTripCard(finalize, cachedWeather, cachedAttractions);
+          cardEmitted = true;
           log.toolResult(toolLabel("finalizeTripCard"), {
             toolCallId: event.run_id,
             toolName: "finalizeTripCard",
@@ -518,6 +584,17 @@ export async function chatRoute(ctx: Context): Promise<void> {
         }
 
         completedToolCalls.add(event.run_id);
+
+        // 该 run_id 在 start 阶段被 dedup 抑制了 → end 也跳过，不污染 cache。
+        // 否则第二次工具结果（譬如历史地名"上海"的数据）会覆盖第一次（当前"北京"）的 cache。
+        if (!emittedToolStartRunIds.has(event.run_id)) {
+          log.debug("跳过被去重抑制的 tool_end", {
+            toolName: event.name,
+            runId: event.run_id,
+          });
+          continue;
+        }
+
         const result = extractToolResult(event.data?.output);
 
         // 缓存供 finalizeTripCard 合并时复用；解析失败（如工具抛错导致 result 变成字符串）则不缓存。
@@ -564,6 +641,9 @@ export async function chatRoute(ctx: Context): Promise<void> {
   } finally {
     ctx.req.off("close", onRequestClose);
     ctx.res.off("close", onResponseClose);
-    stream.end();
+    // 自接管 ctx.res 后必须自己 end()——Koa 不会再帮我们收尾。
+    if (!ctx.res.writableEnded) {
+      ctx.res.end();
+    }
   }
 }

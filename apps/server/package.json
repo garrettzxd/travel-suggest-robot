@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsc -b && (trap 'kill 0' EXIT INT TERM; tsc -b -w --preserveWatchOutput & dotenv -e ../../.env -- node --watch dist/index.js)",
-    "build": "tsc -p .",
+    "build": "tsc -b",
     "start": "dotenv -e ../../.env -- node dist/index.js",
     "typecheck": "tsc --noEmit",
     "ping:llm": "tsc -b && dotenv -e ../../.env -- node dist/scripts/ping-llm.js",

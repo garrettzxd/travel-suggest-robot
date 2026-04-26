@@ -1,8 +1,16 @@
 import { useRef, useState } from 'react';
 import { STREAM_SEPARATOR, PART_SEPARATOR, KV_SEPARATOR } from '@travel/shared';
-import type { ChatMessage, ChatRequest, ToolName } from '@travel/shared';
+import type {
+  Attraction,
+  ChatMessage,
+  ChatRequest,
+  ToolName,
+  TripCard,
+  WeatherSnapshot,
+} from '@travel/shared';
 import { postChat } from '../api/client';
 
+/** 单次 tool 调用的轨迹（保留为 fallback / 调试入口，TripCardView 不再依赖它）。 */
 export interface ToolTraceEntry {
   name: ToolName;
   status: 'running' | 'done' | 'error';
@@ -10,14 +18,25 @@ export interface ToolTraceEntry {
   result?: unknown;
 }
 
+/**
+ * 单条聊天消息。
+ * - assistant 消息可携带 weather / attractions / card 三种结构化数据，
+ *   ChatPage 据此决定渲染 TripCardView 还是降级到 MarkdownTyping。
+ * - hasToolStart 标记本轮是否已收到任一 tool_start：用于区分"闲聊（无工具）"与"卡片流"，
+ *   闲聊场景仍走 markdown bubble，不渲染卡片骨架。
+ */
 export interface TravelChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   status?: 'local' | 'loading' | 'updating' | 'success' | 'error' | 'abort';
+  weather?: WeatherSnapshot;
+  attractions?: Attraction[];
+  card?: TripCard;
+  hasToolStart?: boolean;
 }
 
-// 解析单个 SSE frame，兼容多行 data 字段并在 JSON 解析失败时保留原文。
+/** 解析单个 SSE frame，兼容多行 data 字段并在 JSON 解析失败时保留原文。 */
 function parseFrame(frame: string): { event: string; data: unknown } | null {
   let event: string | undefined;
   let rawData = '';
@@ -37,7 +56,7 @@ function parseFrame(frame: string): { event: string; data: unknown } | null {
   }
 }
 
-// 持续读取响应流，按 SSE 分隔符切分并逐个产出事件帧。
+/** 持续读取响应流，按 SSE 分隔符切分并逐个产出事件帧。 */
 async function* readSseFrames(stream: ReadableStream<Uint8Array>) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
@@ -69,17 +88,39 @@ async function* readSseFrames(stream: ReadableStream<Uint8Array>) {
   }
 }
 
-// 将 UI 消息转换为服务端需要的历史消息结构。
+/**
+ * 给已经渲染过 TripCard 的 assistant 历史回合合成一条"已完成"摘要。
+ * - prompt 让 LLM 调完 finalizeTripCard 后空字符串收尾，导致 history 里 content="";
+ *   下游 LLM 看到空 assistant 回合会误以为上一轮没完成，对历史地名重复调工具。
+ * - 这里把空 content + 有结构化数据的 assistant 消息替换成 "[已为「xxx」生成行程卡...]"，
+ *   让模型清楚那一轮已收口，新一轮只需处理当前用户消息。
+ */
+function summarizeAssistantTurn(message: TravelChatMessage): string {
+  if (message.role !== 'assistant') return message.content;
+  if (message.content.trim()) return message.content;
+
+  if (message.card) {
+    const city = message.card.hero.city || message.card.hero.regionPath || '上一目的地';
+    return `[已为「${city}」生成完整行程卡（含天气、${message.card.attractions.length} 条景点、出行建议）。请勿为该地名重复调用工具。]`;
+  }
+  if (message.weather || message.attractions) {
+    const city = message.weather?.location ?? '上一目的地';
+    return `[已查询「${city}」的天气和景点。请勿重复调用相同工具。]`;
+  }
+  return message.content;
+}
+
+/** 将 UI 消息转换为服务端需要的历史消息结构（已完成回合会被合成可读摘要）。 */
 function toHistory(messages: TravelChatMessage[]): ChatMessage[] {
   return messages.map((message, index) => ({
     role: message.role,
-    content: message.content,
+    content: summarizeAssistantTurn(message),
     id: message.id,
     createdAt: Date.now() + index,
   }));
 }
 
-// 将最近一个同名运行中工具标记为完成，找不到时补一条完成记录。
+/** 将最近一个同名运行中工具标记为完成，找不到时补一条完成记录。 */
 function markToolDone(entries: ToolTraceEntry[], payload: { name: ToolName; result: unknown }) {
   const next = [...entries];
   // 从后往前匹配，避免并行工具或重复工具名时更新到更早的调用记录。
@@ -94,14 +135,49 @@ function markToolDone(entries: ToolTraceEntry[], payload: { name: ToolName; resu
   return next;
 }
 
-// useTravelAgent 封装聊天请求、SSE 消费、消息状态和工具进度状态。
+/** 把 getAttractions 工具结果（可能是 JSON 字符串或已反序列化数组）归一成 Attraction[]。 */
+function normalizeAttractionsResult(result: unknown): Attraction[] | undefined {
+  if (Array.isArray(result)) return result as Attraction[];
+  if (typeof result === 'string') {
+    try {
+      const parsed = JSON.parse(result);
+      if (Array.isArray(parsed)) return parsed as Attraction[];
+    } catch {
+      // 忽略：解析失败按未拿到结构化数据处理。
+    }
+  }
+  return undefined;
+}
+
+/**
+ * 通用 patch 助手：找到 id 匹配的 assistant 消息并应用 patch；
+ * 不存在或非 assistant 时原数组返回，避免误伤 user 气泡。
+ */
+function patchAssistantMessage(
+  messages: TravelChatMessage[],
+  id: string,
+  patch: Partial<TravelChatMessage>,
+): TravelChatMessage[] {
+  return messages.map((entry) =>
+    entry.id === id && entry.role === 'assistant' ? { ...entry, ...patch } : entry,
+  );
+}
+
+/**
+ * useTravelAgent：封装聊天请求、SSE 消费、消息状态、工具进度，以及 PRD §7 引入的
+ * 三种结构化数据（weather / attractions / card）。返回的 messages 直接给 ChatPage 渲染。
+ */
 export function useTravelAgent() {
   const [messages, setMessages] = useState<TravelChatMessage[]>([]);
   const [toolTrace, setToolTrace] = useState<ToolTraceEntry[]>([]);
   const [isRequesting, setIsRequesting] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  // 发送用户输入并把服务端 SSE 事件增量合并到当前 assistant 消息。
+  /**
+   * 发送用户输入并把服务端 SSE 事件增量合并到当前 assistant 消息。
+   * 每个 tool_end / card 事件都会就地 patch assistant 消息，使 ChatPage 能根据数据可用性
+   * 决定 TripCardView 各子卡的骨架/裸数据/完整态。
+   */
   async function onRequest(input: string) {
     const message = input.trim();
     if (!message) return;
@@ -139,11 +215,10 @@ export function useTravelAgent() {
           const delta = (data as { delta?: string }).delta ?? '';
           accumulated += delta;
           setMessages((prev) =>
-            prev.map((entry) =>
-              entry.id === assistantMessageId
-                ? { ...entry, content: accumulated, status: 'updating' }
-                : entry,
-            ),
+            patchAssistantMessage(prev, assistantMessageId, {
+              content: accumulated,
+              status: 'updating',
+            }),
           );
           continue;
         }
@@ -154,23 +229,56 @@ export function useTravelAgent() {
             ...prev,
             { name: payload.name, status: 'running', args: payload.args },
           ]);
+          // tool_start 标记 → ChatPage 据此判断切换到卡片流（PRD §7.5）。
+          setMessages((prev) =>
+            patchAssistantMessage(prev, assistantMessageId, {
+              hasToolStart: true,
+              status: 'updating',
+            }),
+          );
           continue;
         }
 
         if (event === 'tool_end') {
           const payload = data as { name: ToolName; result: unknown };
           setToolTrace((prev) => markToolDone(prev, payload));
+          // 把裸数据落到当前 assistant 消息上，TripCardView 即时升级对应子卡。
+          if (payload.name === 'getWeather' && payload.result && typeof payload.result === 'object') {
+            setMessages((prev) =>
+              patchAssistantMessage(prev, assistantMessageId, {
+                weather: payload.result as WeatherSnapshot,
+              }),
+            );
+          } else if (payload.name === 'getAttractions') {
+            const items = normalizeAttractionsResult(payload.result);
+            if (items) {
+              setMessages((prev) =>
+                patchAssistantMessage(prev, assistantMessageId, {
+                  attractions: items,
+                }),
+              );
+            }
+          }
+          continue;
+        }
+
+        if (event === 'card') {
+          const card = (data as { card?: TripCard }).card;
+          if (card) {
+            setMessages((prev) =>
+              patchAssistantMessage(prev, assistantMessageId, { card }),
+            );
+          }
           continue;
         }
 
         if (event === 'final') {
           accumulated = (data as { content?: string }).content ?? accumulated;
           setMessages((prev) =>
-            prev.map((entry) =>
-              entry.id === assistantMessageId
-                ? { ...entry, content: accumulated, status: 'success' }
-                : entry,
-            ),
+            patchAssistantMessage(prev, assistantMessageId, {
+              content: accumulated,
+              status: 'success',
+            }),
           );
           continue;
         }
@@ -184,11 +292,10 @@ export function useTravelAgent() {
             ),
           );
           setMessages((prev) =>
-            prev.map((entry) =>
-              entry.id === assistantMessageId
-                ? { ...entry, content: `请求失败：${errorMessage}`, status: 'error' }
-                : entry,
-            ),
+            patchAssistantMessage(prev, assistantMessageId, {
+              content: `请求失败：${errorMessage}`,
+              status: 'error',
+            }),
           );
           return;
         }
@@ -204,11 +311,10 @@ export function useTravelAgent() {
           ),
         );
         setMessages((prev) =>
-          prev.map((entry) =>
-              entry.id === assistantMessageId
-                ? { ...entry, content: `请求失败：${messageText}`, status: 'error' }
-                : entry,
-          ),
+          patchAssistantMessage(prev, assistantMessageId, {
+            content: `请求失败：${messageText}`,
+            status: 'error',
+          }),
         );
       }
     } finally {

@@ -16,6 +16,29 @@ body,
 }
 
 body {
-  background: #f5f5f5;
-  color: rgba(0, 0, 0, 0.88);
+  /* 米白主题底色，与 design tokens 中的 colors.bg 保持同步。 */
+  background: #fafaf7;
+  color: #1a1a1a;
+}
+
+/* 卡片骨架/占位斜纹底，DestinationHero 与 AttractionList 的缩略图使用。 */
+.placeholder-stripe {
+  background-image: repeating-linear-gradient(
+    135deg,
+    #ecebe4 0,
+    #ecebe4 6px,
+    #f4f1ea 6px,
+    #f4f1ea 12px
+  );
+}
+
+/* 轻微的脉冲动画，作为骨架态的辅助提示。AntD Skeleton 自身有 shimmer，这里做兜底。 */
+@keyframes pulseSoft {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
 }
