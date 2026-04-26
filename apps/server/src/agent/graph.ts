@@ -5,12 +5,13 @@ import { llm } from "../llm/provider.js";
 import { getWeatherTool } from "./tools/getWeather.js";
 import { getAttractionsTool } from "./tools/getAttractions.js";
 import { finalizeTripCardTool } from "./tools/finalizeTripCard.js";
+import { recommendItineraryTool } from "./tools/recommendItinerary.js";
 import { TRAVEL_SYSTEM_PROMPT } from "./prompts.js";
 
-// finalizeTripCard 是内部工具：不会以 tool_start/tool_end 形式下发给前端，
-// 由 chat 路由在它结束时合并 weather + attractions + narrative，emit 'card' 事件。
+// finalizeTripCard / recommendItinerary 是内部工具：不会以 tool_start/tool_end 形式下发给前端，
+// 由 chat 路由在工具结束时转换成 card / itinerary 结构化事件。
 export const agent = createAgent({
   model: llm,
-  tools: [getWeatherTool, getAttractionsTool, finalizeTripCardTool],
+  tools: [getWeatherTool, getAttractionsTool, finalizeTripCardTool, recommendItineraryTool],
   systemPrompt: TRAVEL_SYSTEM_PROMPT,
 });

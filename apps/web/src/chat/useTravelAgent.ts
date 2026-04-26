@@ -4,6 +4,7 @@ import type {
   Attraction,
   ChatMessage,
   ChatRequest,
+  Itinerary,
   ToolName,
   TripCard,
   WeatherSnapshot,
@@ -20,8 +21,8 @@ export interface ToolTraceEntry {
 
 /**
  * 单条聊天消息。
- * - assistant 消息可携带 weather / attractions / card 三种结构化数据，
- *   ChatPage 据此决定渲染 TripCardView 还是降级到 MarkdownTyping。
+ * - assistant 消息可携带 weather / attractions / card / itinerary 四类结构化数据，
+ *   ChatPage 据此决定渲染结构化卡片还是降级到 MarkdownTyping。
  * - hasToolStart 标记本轮是否已收到任一 tool_start：用于区分"闲聊（无工具）"与"卡片流"，
  *   闲聊场景仍走 markdown bubble，不渲染卡片骨架。
  */
@@ -33,6 +34,7 @@ export interface TravelChatMessage {
   weather?: WeatherSnapshot;
   attractions?: Attraction[];
   card?: TripCard;
+  itinerary?: Itinerary;
   hasToolStart?: boolean;
 }
 
@@ -102,6 +104,10 @@ function summarizeAssistantTurn(message: TravelChatMessage): string {
   if (message.card) {
     const city = message.card.hero.city || message.card.hero.regionPath || '上一目的地';
     return `[已为「${city}」生成完整行程卡（含天气、${message.card.attractions.length} 条景点、出行建议）。请勿为该地名重复调用工具。]`;
+  }
+  if (message.itinerary) {
+    const title = message.itinerary.title || '上一目的地';
+    return `[已为「${title}」生成行程规划（${message.itinerary.days.length} 天逐日路线）。请勿为该行程重复调用工具。]`;
   }
   if (message.weather || message.attractions) {
     const city = message.weather?.location ?? '上一目的地';
@@ -267,6 +273,16 @@ export function useTravelAgent() {
           if (card) {
             setMessages((prev) =>
               patchAssistantMessage(prev, assistantMessageId, { card }),
+            );
+          }
+          continue;
+        }
+
+        if (event === 'itinerary') {
+          const itinerary = (data as { itinerary?: Itinerary }).itinerary;
+          if (itinerary) {
+            setMessages((prev) =>
+              patchAssistantMessage(prev, assistantMessageId, { itinerary }),
             );
           }
           continue;

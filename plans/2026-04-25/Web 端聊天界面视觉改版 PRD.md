@@ -180,7 +180,7 @@ Props：`TravelVerdict & { headline: string; followUps?: string[] }`
 
 ## 6. Backend 技术方案
 
-> 本章节内容映射自 [plans/markdown-synthetic-sloth.md](markdown-synthetic-sloth.md)。补齐原始字段 + 新增 `finalizeTripCard` 工具产出 narrative / chips + 新增 `card` SSE 事件，前端据此组装卡片。
+> 本章节内容映射自 [plans/markdown-synthetic-sloth.md](../2026-04-24/markdown-synthetic-sloth.md)。补齐原始字段 + 新增 `finalizeTripCard` 工具产出 narrative / chips + 新增 `card` SSE 事件，前端据此组装卡片。
 
 ### 6.1 数据契约扩展
 
@@ -270,7 +270,7 @@ Props：`TravelVerdict & { headline: string; followUps?: string[] }`
 
 ## 7. Frontend 技术方案
 
-> 本章节内容映射自 [plans/markdown-synthetic-sloth.md](markdown-synthetic-sloth.md)。核心思路：**每个卡片都是独立可复用组件，自带骨架态**，由 `TripCardView` 组合；Markdown 打字机保留作为无结构化数据的 fallback。
+> 本章节内容映射自 [plans/markdown-synthetic-sloth.md](../2026-04-24/markdown-synthetic-sloth.md)。核心思路：**每个卡片都是独立可复用组件，自带骨架态**，由 `TripCardView` 组合；Markdown 打字机保留作为无结构化数据的 fallback。
 
 ### 7.1 状态管理 `useTravelAgent`
 

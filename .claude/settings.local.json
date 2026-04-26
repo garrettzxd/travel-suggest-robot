@@ -50,7 +50,10 @@
       "Bash(gh pr *)",
       "Bash(command -v gh)",
       "Bash(brew --prefix gh)",
-      "Bash(/usr/local/opt/gh/bin/gh --version)"
+      "Bash(/usr/local/opt/gh/bin/gh --version)",
+      "Bash(awk 'length\\($0\\) < 500' /Users/garrettzxd/codes/travel-suggest-robot/plans/2026-04-26/Itinerary-planning.html)",
+      "Bash(node -e ' *)",
+      "Bash(pnpm --filter @travel/web exec tsc --noEmit)"
     ]
   }
 }

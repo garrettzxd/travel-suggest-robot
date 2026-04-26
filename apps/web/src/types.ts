@@ -8,4 +8,5 @@ export type {
   WeatherSnapshot,
   TravelVerdict,
   TripCard,
+  Itinerary,
 } from '@travel/shared';

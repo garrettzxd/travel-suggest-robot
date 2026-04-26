@@ -7,6 +7,7 @@ import { TopBar } from './TopBar';
 import { InputBar } from './InputBar';
 import { WelcomeCard } from './cards/WelcomeCard';
 import { TripCardView } from './cards/TripCardView';
+import { ItineraryCard } from './cards/ItineraryCard';
 import { useTravelAgent, type TravelChatMessage } from './useTravelAgent';
 import { colors, layout, radius, spacing } from '../theme/tokens';
 
@@ -106,8 +107,8 @@ function deriveTitle(messages: TravelChatMessage[]): string {
 }
 
 /**
- * ChatPage 路由层：根据 assistant 消息上是否带 weather/attractions/card 决定渲染
- * TripCardView 还是 MarkdownTyping。空会话顶部展示 WelcomeCard。
+ * ChatPage 路由层：根据 assistant 消息上是否带结构化卡片数据决定渲染
+ * TripCardView / ItineraryCard 还是 MarkdownTyping。空会话顶部展示 WelcomeCard。
  */
 export default function ChatPage() {
   const { messages, onRequest, isRequesting } = useTravelAgent();
@@ -196,7 +197,7 @@ export default function ChatPage() {
 }
 
 /**
- * 单条消息分发：user → UserBubble；assistant 视数据可用性走 TripCardView 或 markdown 兜底。
+ * 单条消息分发：user → UserBubble；assistant 视数据可用性走结构化卡片或 markdown 兜底。
  * 切换条件遵循 PRD §7.5：
  *   - loading 且未收到任何 tool_start → "正在思考中..."
  *   - 已收到 tool_start，或已有任何结构化数据 → TripCardView（按可用字段升级）
@@ -215,7 +216,8 @@ function MessageRow({
   }
 
   const time = deriveMessageTime(message.id);
-  const hasStructured = !!(message.weather || message.attractions || message.card);
+  const hasTripCardData = !!(message.weather || message.attractions || message.card);
+  const hasStructured = !!(hasTripCardData || message.itinerary);
 
   // error：使用红色 Bubble 单独展示。
   if (message.status === 'error') {
@@ -254,10 +256,20 @@ function MessageRow({
     );
   }
 
-  // 进入卡片流：要么已经收到 tool_start，要么已经有结构化字段。
+  // 完整行程规划卡：recommendItinerary 是内部工具，没有 tool_start，收到 itinerary 后直接渲染。
+  if (message.itinerary && !message.card) {
+    return (
+      <div>
+        <AssistantHeader time={time} />
+        <ItineraryCard {...message.itinerary} />
+      </div>
+    );
+  }
+
+  // 进入 TripCard 流：要么已经收到 tool_start，要么已经有 TripCard 相关结构化字段。
   // settled 在 status 已经收口（success；error 已经在上面分支提前 return）时为 true，
   // 子卡据此把骨架切静态空态，停止永远转的骨架动画。
-  if (message.hasToolStart || hasStructured) {
+  if (message.hasToolStart || hasTripCardData) {
     const settled = message.status === 'success';
     return (
       <div>

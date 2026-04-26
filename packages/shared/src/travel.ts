@@ -121,3 +121,41 @@ export interface TripCard {
   /** 四条后续追问建议 chip，恰好 4 条 */
   chips: string[];
 }
+
+/**
+ * 一日行程内的单个活动条目。
+ * 对应行程规划卡时间轴上的一个节点。
+ */
+export interface ItineraryItem {
+  /** 时段或具体时间，如 "上午"、"傍晚"、"8:00"、"或"；可空 */
+  time?: string;
+  /** 主活动标题，如 "断桥残雪 → 白堤 → 平湖秋月" */
+  title: string;
+  /** 右侧标签 pill，如 "步行"、"船游"、"人文"；可空 */
+  tag?: string;
+  /** 一句话补充说明：路线、时长、提示 */
+  desc: string;
+}
+
+/**
+ * 一日行程：左侧 rail 显示 DAY N + subtitle，右侧时间轴串联多条 item。
+ */
+export interface ItineraryDay {
+  /** 当天主题副标题，如 "西湖核心区"、"灵隐 + 西溪 / 龙井"；可空 */
+  subtitle?: string;
+  /** 时间轴条目，建议 2–5 条 */
+  items: ItineraryItem[];
+}
+
+/**
+ * 一张完整的「行程规划卡」。
+ * 与 TripCard 平级，由 recommendItinerary 工具产出并通过 SSE `itinerary` 事件下发。
+ */
+export interface Itinerary {
+  /** 卡片标题，如 "5/1 三天两晚 · 杭州行程" */
+  title: string;
+  /** 逐日时间轴，长度等于总天数，建议 1–5 天 */
+  days: ItineraryDay[];
+  /** 底部"提示"虚线区文案；可空 */
+  footnote?: string;
+}

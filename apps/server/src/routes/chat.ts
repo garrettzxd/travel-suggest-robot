@@ -6,12 +6,14 @@ import type {
   Attraction,
   ChatMessage,
   ChatRequest,
+  Itinerary,
   ToolName,
   TripCard,
   WeatherSnapshot,
 } from "@travel/shared";
 import { agent } from "../agent/graph.js";
 import type { FinalizeTripCardInput } from "../agent/tools/finalizeTripCard.js";
+import type { RecommendItineraryInput } from "../agent/tools/recommendItinerary.js";
 import { writeEvent } from "../utils/sse.js";
 import {
   createChatLogger,
@@ -43,7 +45,7 @@ interface LangChainStreamEvent {
  * 把前端历史消息拼成 LangGraph 能消费的 `{role, content}[]`，末尾附上本轮 user 输入。
  *
  * 处理两类边界情况：
- * - 空 assistant content：前端有时会把"已完成的 TripCard 回合"合成 "[已为「xxx」生成行程卡]"
+ * - 空 assistant content：前端有时会把"已完成的结构化卡片回合"合成 "[已为「xxx」生成...]"
  *   这种摘要发回来；但万一没合成（旧客户端 / 异常路径）就只剩 ""。直接发给 Moonshot
  *   会报 "unknown content type:"，且模型也会以为上一轮没完成而重复调工具。
  *   这里统一兜底成 "[此前一回合已完成，请勿重复调用相同工具]" 的占位。
@@ -62,7 +64,7 @@ function historyToAgentMessages(history: ChatMessage[], message: string) {
         role: item.role,
         content:
           item.role === "assistant" && item.content.trim() === ""
-            ? "[此前一回合已生成行程卡或完成处理，请勿为该地名重复调用工具。]"
+            ? "[此前一回合已生成结构化旅行卡片或完成处理，请勿为该地名重复调用工具。]"
             : item.content,
       })),
     {
@@ -139,12 +141,13 @@ function toolLabel(name: ToolName): string {
   if (name === "getWeather") return "天气工具";
   if (name === "getAttractions") return "景点工具";
   if (name === "finalizeTripCard") return "行程卡合并";
+  if (name === "recommendItinerary") return "行程规划";
   return name;
 }
 
 /**
  * 类型守卫：仅匹配会对外下发 tool_start / tool_end 的公开工具名。
- * finalizeTripCard 是内部工具，由 chat 路由合并后 emit 'card' 事件，不走这条分支。
+ * finalizeTripCard / recommendItinerary 是内部工具，由 chat 路由转成结构化卡片事件，不走这条分支。
  */
 function isPublicToolName(name: string): name is "getWeather" | "getAttractions" {
   return name === "getWeather" || name === "getAttractions";
@@ -206,6 +209,22 @@ function isFinalizeInput(value: unknown): value is FinalizeTripCardInput {
     Array.isArray(candidate.attractions) &&
     !!candidate.recommendation &&
     Array.isArray(candidate.chips)
+  );
+}
+
+/**
+ * recommendItinerary 工具 result 做 runtime 宽松校验。
+ * Zod 已经在工具调用前校过一遍；这里只防御工具异常字符串或非预期包装。
+ */
+function isRecommendItineraryInput(value: unknown): value is RecommendItineraryInput {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<RecommendItineraryInput>;
+  return (
+    typeof candidate.title === "string" &&
+    candidate.title.trim().length > 0 &&
+    Array.isArray(candidate.days) &&
+    candidate.days.length > 0 &&
+    candidate.days.every((day) => Array.isArray(day.items) && day.items.length > 0)
   );
 }
 
@@ -371,6 +390,7 @@ export async function chatRoute(ctx: Context): Promise<void> {
   // 被 dedup 抑制的 start 对应的 end 也必须丢弃，否则 cache 会被第二次工具结果覆盖。
   const emittedToolStartRunIds = new Set<string>();
   let cardEmitted = false;
+  let itineraryEmitted = false;
   // 缓存两个外部工具的裸结果，finalizeTripCard 收尾时用它们拼 TripCard。
   let cachedWeather: WeatherSnapshot | undefined;
   let cachedAttractions: Attraction[] | undefined;
@@ -486,8 +506,8 @@ export async function chatRoute(ctx: Context): Promise<void> {
       }
 
       if (event.event === "on_tool_start") {
-        // finalizeTripCard 是内部工具：不对外暴露 tool_start。
-        if (event.name === "finalizeTripCard") {
+        // 内部工具不对外暴露 tool_start。
+        if (event.name === "finalizeTripCard" || event.name === "recommendItinerary") {
           log.debug("内部工具启动（不下发）", { toolName: event.name, runId: event.run_id });
           continue;
         }
@@ -525,6 +545,46 @@ export async function chatRoute(ctx: Context): Promise<void> {
       }
 
       if (event.event === "on_tool_end") {
+        // recommendItinerary 结束时：直接 emit 'itinerary'，不再走公开 tool_end。
+        if (event.name === "recommendItinerary") {
+          if (completedToolCalls.has(event.run_id)) {
+            continue;
+          }
+          completedToolCalls.add(event.run_id);
+          // 单轮只允许一张结构化卡片；若 TripCard 已出，itinerary 静默丢弃。
+          if (itineraryEmitted || cardEmitted) {
+            log.warn("recommendItinerary 在单轮内被重复触发或与 card 冲突，已忽略", {
+              runId: event.run_id,
+              cardEmitted,
+              itineraryEmitted,
+            });
+            continue;
+          }
+
+          const itineraryResult = extractToolResult(event.data?.output);
+          if (!isRecommendItineraryInput(itineraryResult)) {
+            log.warn("recommendItinerary 返回体不合法，跳过 itinerary 事件", {
+              runId: event.run_id,
+              preview: previewJson(itineraryResult),
+            });
+            continue;
+          }
+
+          const itinerary: Itinerary = itineraryResult;
+          itineraryEmitted = true;
+          log.toolResult(toolLabel("recommendItinerary"), {
+            toolCallId: event.run_id,
+            toolName: "recommendItinerary",
+            resultPreview: previewJson({
+              title: itinerary.title,
+              days: itinerary.days.length,
+              hasFootnote: !!itinerary.footnote,
+            }),
+          });
+          emitEvent("itinerary", { itinerary });
+          continue;
+        }
+
         // finalizeTripCard 结束时：合并 weather + attractions + narrative，emit 'card'。
         if (event.name === "finalizeTripCard") {
           if (completedToolCalls.has(event.run_id)) {
@@ -533,9 +593,11 @@ export async function chatRoute(ctx: Context): Promise<void> {
           completedToolCalls.add(event.run_id);
           // 单轮只下发一张 card；LLM 重复调 finalize 时第二次起静默丢弃，
           // 避免前端 card 状态被反复覆盖出现"地点是 A 但景点是 B"的错乱。
-          if (cardEmitted) {
-            log.warn("finalizeTripCard 在单轮内被重复触发，已忽略多余 card", {
+          if (cardEmitted || itineraryEmitted) {
+            log.warn("finalizeTripCard 在单轮内被重复触发或与 itinerary 冲突，已忽略多余 card", {
               runId: event.run_id,
+              cardEmitted,
+              itineraryEmitted,
             });
             continue;
           }

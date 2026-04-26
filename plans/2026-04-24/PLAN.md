@@ -254,31 +254,31 @@ export interface TravelVerdict { goodTimeToVisit: boolean; reason: string }
 
 ## 需要修改/新建的关键文件
 
-- [package.json](../package.json)（root，含 scripts 和 workspace 声明）
-- [pnpm-workspace.yaml](../pnpm-workspace.yaml)
-- [tsconfig.base.json](../tsconfig.base.json)
-- [packages/shared/src/chat.ts](../packages/shared/src/chat.ts)
-- [packages/shared/src/travel.ts](../packages/shared/src/travel.ts)
-- [packages/shared/src/sse.ts](../packages/shared/src/sse.ts)（STREAM/PART/KV 三个分隔符常量，前后端共享）
-- [apps/server/src/index.ts](../apps/server/src/index.ts)
-- [apps/server/src/app.ts](../apps/server/src/app.ts)
-- [apps/server/src/env.ts](../apps/server/src/env.ts)
-- [apps/server/src/routes/chat.ts](../apps/server/src/routes/chat.ts)
-- [apps/server/src/utils/sse.ts](../apps/server/src/utils/sse.ts)
-- [apps/server/src/agent/graph.ts](../apps/server/src/agent/graph.ts)
-- [apps/server/src/agent/prompts.ts](../apps/server/src/agent/prompts.ts)
-- [apps/server/src/agent/tools/getWeather.ts](../apps/server/src/agent/tools/getWeather.ts)
-- [apps/server/src/agent/tools/getAttractions.ts](../apps/server/src/agent/tools/getAttractions.ts)
-- [apps/server/src/llm/provider.ts](../apps/server/src/llm/provider.ts)
-- [apps/web/vite.config.ts](../apps/web/vite.config.ts)
-- [apps/web/src/main.tsx](../apps/web/src/main.tsx)
-- [apps/web/src/chat/ChatPage.tsx](../apps/web/src/chat/ChatPage.tsx)
-- [apps/web/src/chat/useTravelAgent.ts](../apps/web/src/chat/useTravelAgent.ts)
-- [apps/web/src/api/client.ts](../apps/web/src/api/client.ts)
-- [Dockerfile.server](../Dockerfile.server)
-- [Dockerfile.web](../Dockerfile.web)
-- [docker-compose.yml](../docker-compose.yml)
-- [.env.example](../.env)
+- [package.json](../../package.json)（root，含 scripts 和 workspace 声明）
+- [pnpm-workspace.yaml](../../pnpm-workspace.yaml)
+- [tsconfig.base.json](../../tsconfig.base.json)
+- [packages/shared/src/chat.ts](../../packages/shared/src/chat.ts)
+- [packages/shared/src/travel.ts](../../packages/shared/src/travel.ts)
+- [packages/shared/src/sse.ts](../../packages/shared/src/sse.ts)（STREAM/PART/KV 三个分隔符常量，前后端共享）
+- [apps/server/src/index.ts](../../apps/server/src/index.ts)
+- [apps/server/src/app.ts](../../apps/server/src/app.ts)
+- [apps/server/src/env.ts](../../apps/server/src/env.ts)
+- [apps/server/src/routes/chat.ts](../../apps/server/src/routes/chat.ts)
+- [apps/server/src/utils/sse.ts](../../apps/server/src/utils/sse.ts)
+- [apps/server/src/agent/graph.ts](../../apps/server/src/agent/graph.ts)
+- [apps/server/src/agent/prompts.ts](../../apps/server/src/agent/prompts.ts)
+- [apps/server/src/agent/tools/getWeather.ts](../../apps/server/src/agent/tools/getWeather.ts)
+- [apps/server/src/agent/tools/getAttractions.ts](../../apps/server/src/agent/tools/getAttractions.ts)
+- [apps/server/src/llm/provider.ts](../../apps/server/src/llm/provider.ts)
+- [apps/web/vite.config.ts](../../apps/web/vite.config.ts)
+- [apps/web/src/main.tsx](../../apps/web/src/main.tsx)
+- [apps/web/src/chat/ChatPage.tsx](../../apps/web/src/chat/ChatPage.tsx)
+- [apps/web/src/chat/useTravelAgent.ts](../../apps/web/src/chat/useTravelAgent.ts)
+- [apps/web/src/api/client.ts](../../apps/web/src/api/client.ts)
+- [Dockerfile.server](../../Dockerfile.server)
+- [Dockerfile.web](../../Dockerfile.web)
+- [docker-compose.yml](../../docker-compose.yml)
+- [.env.example](../../.env)
 
 ## 关键依赖（版本按 2026-04 最新稳定版；`pnpm install` 时由 pnpm 解析到当时 latest）
 
