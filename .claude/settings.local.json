@@ -58,7 +58,8 @@
       "Bash(echo \"exit=$?\")",
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d['scripts'], indent=2, ensure_ascii=False\\)\\)\")",
       "Bash(pnpm --filter @travel/web typecheck)",
-      "Bash(pnpm --filter @travel/server typecheck)"
+      "Bash(pnpm --filter @travel/server typecheck)",
+      "Bash(git -C /Users/garrettzxd/codes/travel-suggest-robot diff --stat HEAD)"
     ]
   }
 }
