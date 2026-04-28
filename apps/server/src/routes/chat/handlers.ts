@@ -293,7 +293,7 @@ function handleFinalizeTripWeatherEnd(
   // 完整 TripCard 流里 finalizeTripWeather 跑到时 destinationEmitted 必为 true（prompt 强制
   // step2 destination → step3 weather），不会被误判。
   if (!state.destinationEmitted && !state.cachedAttractions) {
-    state.weatherOnlyShortCircuit = true;
+    state.shouldShortCircuit = true;
     state.finalContent = weather.summary;
     log.debug("weather-only 流程，card_weather 后短路 LLM 续流", {
       runId: event.run_id,
@@ -375,6 +375,18 @@ function handleFinalizeTripAttractionsSummaryEnd(
     attractions,
     recommendation,
     chips: summary.chips,
+  });
+
+  // 完整 TripCard 流短路：hero / weather / attractions / recommendation / chips 至此全齐，
+  // prompt step5 本就要求 LLM 以空字符串结束本轮回复，但模型实际仍会续写 "[已为「xxx」生成完整行程卡…]"
+  // 这种无信息增量的字符串，白白等十几到几十秒。直接置短路标志，让 route.ts 立即收尾。
+  // finalContent 留空：前端 useTravelAgent.summarizeAssistantTurn 会基于 message.card 自合成
+  // 含景点数量的历史摘要，比 LLM 输出更准确。
+  state.shouldShortCircuit = true;
+  state.finalContent = "";
+  log.debug("完整 TripCard 流短路 LLM 续流", {
+    runId: event.run_id,
+    attractionsCount: attractions.length,
   });
 }
 

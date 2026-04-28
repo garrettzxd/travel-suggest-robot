@@ -88,10 +88,12 @@ export async function chatRoute(ctx: Context): Promise<void> {
         handleToolEnd(event, state, { emitEvent, log });
       }
 
-      // weather-only 短路：finalizeTripWeather 已 emit card_weather 且确认是纯天气流，
-      // 直接结束循环，不再消费后续模型 token / 工具事件。
-      if (state.weatherOnlyShortCircuit) {
-        log.debug("weather-only 短路触发，跳过后续 LLM 续流", {
+      // 短路：handler 已 emit 完所有必要的结构化事件，前端无需 LLM 续流也能完整渲染，
+      // 直接结束循环，不再消费后续模型 token / 工具事件。两个触发点：
+      //   1) handleFinalizeTripWeatherEnd —— 纯天气查询，card_weather 后短路；
+      //   2) handleFinalizeTripAttractionsSummaryEnd —— 完整 TripCard 流，最后一段 card 事件后短路。
+      if (state.shouldShortCircuit) {
+        log.debug("短路触发，跳过后续 LLM 续流", {
           durationMs: Date.now() - startedAt,
         });
         break;
@@ -99,13 +101,13 @@ export async function chatRoute(ctx: Context): Promise<void> {
     }
 
     // 短路时主动 abort 上游 LangGraph 流，避免 LLM 续写仍在后台烧 token。
-    if (state.weatherOnlyShortCircuit && !abortController.signal.aborted) {
+    if (state.shouldShortCircuit && !abortController.signal.aborted) {
       abortController.abort();
     }
 
-    // 不论是 LLM 自然收尾还是 weather-only 短路，都需要给前端补 final + done。
-    // 真正的客户端断连仍由 sseLifecycle 中的监听处理，这里靠 weatherOnlyShortCircuit 区分。
-    if (state.weatherOnlyShortCircuit || !abortController.signal.aborted) {
+    // 不论是 LLM 自然收尾还是短路，都需要给前端补 final + done。
+    // 真正的客户端断连仍由 sseLifecycle 中的监听处理，这里靠 shouldShortCircuit 区分。
+    if (state.shouldShortCircuit || !abortController.signal.aborted) {
       // stream 结束时统一汇报本轮丢弃的空文本 chunk 数量，避免逐条刷日志。
       if (state.skippedEmptyChunkCount > 0) {
         log.debug("模型空 chunk 已忽略", { count: state.skippedEmptyChunkCount });

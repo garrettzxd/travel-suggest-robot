@@ -65,9 +65,11 @@ export interface LangChainStreamEvent {
  *   渐进式 TripCard 局部事件缓存，便于日志、互斥与未来兼容完整 card 合成；
  * - finalContent：累积模型输出，结束时一并以 'final' 事件下发；
  * - skippedEmptyChunkCount：模型在 tool_call 拼装期推回的空文本 chunk 计数，stream 结束统一打一行汇总；
- * - weatherOnlyShortCircuit：纯天气查询（仅触发 getWeather + finalizeTripWeather，不进 TripCard 完整流）时，
- *   card_weather 已经下发了完整的天气数据 + summary，无需再让 LLM 续写一段重复的 markdown 文本。
- *   置 true 后 route.ts 主循环会立刻 break 并 abort agent stream，直接走 final + done。
+ * - shouldShortCircuit：通用短路标志。两类场景会置位：
+ *     1) 纯天气查询：getWeather + finalizeTripWeather 跑完，card_weather 已含 7 日 + summary；
+ *     2) 完整 TripCard 流：finalizeTripAttractionsSummary 跑完，hero/weather/attractions/recommendation/chips 全齐。
+ *   两种情况下 LLM 续流都没有信息增量（前端已经能完整渲染），置 true 后 route.ts 主循环立即
+ *   break 并 abort agent stream，直接走 final + done，节省后端 LLM 延迟与 token 消耗。
  */
 export interface ChatStreamState {
   startedToolCalls: Set<string>;
@@ -88,7 +90,7 @@ export interface ChatStreamState {
   attractionsSummaryEmitted: boolean;
   finalContent: string;
   skippedEmptyChunkCount: number;
-  weatherOnlyShortCircuit: boolean;
+  shouldShortCircuit: boolean;
 }
 
 /** 工厂方法：单轮请求开始时创建一个全新的可变状态。 */
@@ -112,6 +114,6 @@ export function createInitialState(): ChatStreamState {
     attractionsSummaryEmitted: false,
     finalContent: "",
     skippedEmptyChunkCount: 0,
-    weatherOnlyShortCircuit: false,
+    shouldShortCircuit: false,
   };
 }
