@@ -6,6 +6,27 @@ import './AttractionList.less';
 
 type AttractionImageStyle = CSSProperties & { '--attraction-image'?: string };
 
+/** 地图线性图标，用于景点推荐卡 header。 */
+function MapIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+      aria-hidden="true"
+      className="travel-attraction-list__icon"
+    >
+      <path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z" />
+      <path d="M9 4v16M15 6v16" />
+    </svg>
+  );
+}
+
 /** AttractionList Props */
 export interface AttractionListProps {
   /** 景点裸数据；缺失时整张卡进入骨架态。 */
@@ -46,18 +67,17 @@ function AttractionRow({ item }: { item: Attraction }) {
             <Skeleton.Input active size="small" className="travel-attraction-row__desc-skeleton-line" />
           </div>
         )}
+      </div>
 
-        <div className="travel-attraction-row__meta">
-          {item.rating !== undefined ? (
-            <span className="travel-attraction-row__rating">★ {item.rating.toFixed(1)}</span>
-          ) : (
-            <span className="travel-attraction-row__muted">暂无评分</span>
-          )}
-          <span className="travel-attraction-row__divider">—</span>
-          <span className="travel-attraction-row__muted">
-            {item.distanceKm !== undefined ? `${item.distanceKm.toFixed(1)} km` : item.address}
-          </span>
-        </div>
+      <div className="travel-attraction-row__meta">
+        {item.rating !== undefined ? (
+          <span className="travel-attraction-row__rating">★ {item.rating.toFixed(1)}</span>
+        ) : (
+          <span className="travel-attraction-row__rating is-muted">暂无评分</span>
+        )}
+        <span className="travel-attraction-row__distance">
+          {item.distanceKm !== undefined ? `${item.distanceKm.toFixed(1)} km` : item.address}
+        </span>
       </div>
     </div>
   );
@@ -69,7 +89,7 @@ function ListSkeleton({ count }: { count: number }) {
     <>
       {Array.from({ length: count }).map((_, idx) => (
         <div key={idx} className="travel-attraction-skeleton">
-          <Skeleton.Avatar active shape="square" size={72} />
+          <Skeleton.Avatar active shape="square" className="travel-attraction-skeleton__image" />
           <div className="travel-attraction-skeleton__body">
             <Skeleton.Input active size="small" />
             <Skeleton paragraph={{ rows: 1, width: '80%' }} title={false} active />
@@ -92,11 +112,14 @@ export function AttractionList({
   const isEmpty = isLoading && settled;
 
   return (
-    <CardContainer>
+    <CardContainer padding="none" elevated={false} className="travel-attraction-list">
       <div className="travel-attraction-list__header">
-        <span className="travel-attraction-list__title">景点推荐</span>
+        <div className="travel-attraction-list__title-group">
+          <MapIcon />
+          <span className="travel-attraction-list__title">值得停留的地方</span>
+        </div>
         <span className="travel-attraction-list__count">
-          {items?.length ? `${items.length} PLACES` : 'POPULAR PLACES'}
+          {items?.length ? `${items.length} / 精选` : '精选地点'}
         </span>
       </div>
 
@@ -105,7 +128,7 @@ export function AttractionList({
       ) : isLoading || !items ? (
         <ListSkeleton count={placeholderCount} />
       ) : (
-        <div>
+        <div className="travel-attraction-list__items">
           {items.map((item) => (
             <AttractionRow key={item.name} item={item} />
           ))}
