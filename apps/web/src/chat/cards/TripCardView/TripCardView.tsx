@@ -3,7 +3,13 @@ import { DestinationHero } from '../DestinationHero';
 import { WeatherCard } from '../WeatherCard';
 import { AttractionList } from '../AttractionList';
 import { RecommendationPanel } from '../RecommendationPanel';
-import type { Attraction, ProgressiveTripCard, TripCard, WeatherSnapshot } from '../../../types';
+import type {
+  Attraction,
+  ProgressiveTripCard,
+  ToolName,
+  TripCard,
+  WeatherSnapshot,
+} from '../../../types';
 import './TripCardView.less';
 
 /** TripCardView Props（PRD §7.3.7）。 */
@@ -20,6 +26,10 @@ export interface TripCardViewProps {
   settled?: boolean;
   /** 点击 chip 后的回调，由 ChatPage 转交 onRequest。 */
   onChipClick?: (text: string) => void;
+  /** 本轮已经触发过 tool_start 的工具名集合，用于裁剪未涉及的槽位。 */
+  toolsStarted?: ToolName[];
+  /** 仅 weather-only 场景下使用：把 final 文本回填到 WeatherCard 的"整体评估"，避免 narrative 丢失。 */
+  fallbackNarrative?: string;
 }
 
 /** 卡片下方独立渲染的 chips 行。 */
@@ -67,33 +77,57 @@ export function TripCardView({
   progressiveCard,
   settled,
   onChipClick,
+  toolsStarted,
+  fallbackNarrative,
 }: TripCardViewProps) {
   const heroData = card?.hero ?? progressiveCard?.hero;
   const weatherData = card?.weather ?? progressiveCard?.weather ?? weather;
-  const weatherSummary = card?.weather?.summary ?? progressiveCard?.weather?.summary;
+  // weather-only 时 card_weather 不会到，summary 兜底用 ChatPage 传下来的 final 文本。
+  const weatherSummary =
+    card?.weather?.summary ?? progressiveCard?.weather?.summary ?? fallbackNarrative;
   const attractionItems = card?.attractions ?? progressiveCard?.attractions ?? attractions;
   const recommendationData = card?.recommendation ?? progressiveCard?.recommendation;
   const chips = card?.chips ?? progressiveCard?.chips;
   const chipsLoading = !chips && !settled;
   const verdict = card?.hero.verdictBadge ?? progressiveCard?.hero?.verdictBadge;
 
+  // cardFlow 表示进入完整 TripCard 流（finalizeTripDestination / finalizeTripAttractionsSummary 至少有一个跑过）。
+  // 注意：card_weather 单独到达不算完整流——weather-only 查询也会触发 finalizeTripWeather → card_weather，
+  // 此时 progressiveCard 已存在但只有 weather 字段，不能据此展开 Hero / 景点 / 出行建议槽。
+  const cardFlow = !!(card || progressiveCard?.hero || progressiveCard?.recommendation);
+  const startedWeather = toolsStarted?.includes('getWeather') ?? false;
+  const startedAttractions = toolsStarted?.includes('getAttractions') ?? false;
+
+  // 仅在数据将要 / 已经到达的槽位渲染骨架或内容；其它槽位整段跳过。
+  const showHero = !!heroData || cardFlow;
+  const showWeather = !!weatherData || startedWeather || cardFlow;
+  const showAttractions = !!attractionItems || startedAttractions || cardFlow;
+  const showRecommendation = !!recommendationData || cardFlow;
+  const showChips = !!chips || cardFlow;
+
   return (
     <div className="travel-trip-card">
-      <DestinationHero data={heroData} loading={!heroData} settled={settled} />
-      <WeatherCard
-        data={weatherData}
-        summary={weatherSummary}
-        loading={!weatherData}
-        settled={settled}
-      />
-      <AttractionList items={attractionItems} loading={!attractionItems} settled={settled} />
-      <RecommendationPanel
-        data={recommendationData}
-        verdict={verdict}
-        loading={!recommendationData}
-        settled={settled}
-      />
-      <ChipsBar chips={chips} onChipClick={onChipClick} loading={chipsLoading} />
+      {showHero && <DestinationHero data={heroData} loading={!heroData} settled={settled} />}
+      {showWeather && (
+        <WeatherCard
+          data={weatherData}
+          summary={weatherSummary}
+          loading={!weatherData}
+          settled={settled}
+        />
+      )}
+      {showAttractions && (
+        <AttractionList items={attractionItems} loading={!attractionItems} settled={settled} />
+      )}
+      {showRecommendation && (
+        <RecommendationPanel
+          data={recommendationData}
+          verdict={verdict}
+          loading={!recommendationData}
+          settled={settled}
+        />
+      )}
+      {showChips && <ChipsBar chips={chips} onChipClick={onChipClick} loading={chipsLoading} />}
     </div>
   );
 }

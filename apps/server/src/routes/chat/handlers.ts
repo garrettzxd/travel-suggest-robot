@@ -286,6 +286,20 @@ function handleFinalizeTripWeatherEnd(
     }),
   });
   emitEvent("card_weather", { weather });
+
+  // weather-only 短路：纯天气查询（没有 finalizeTripDestination 也没有 getAttractions），
+  // card_weather 已带完整 7 日数据 + summary，没必要让 LLM 再续写一段重复 markdown。
+  // 置标志后由 route.ts 主循环 break 并 abort agent stream，直接走 final + done。
+  // 完整 TripCard 流里 finalizeTripWeather 跑到时 destinationEmitted 必为 true（prompt 强制
+  // step2 destination → step3 weather），不会被误判。
+  if (!state.destinationEmitted && !state.cachedAttractions) {
+    state.weatherOnlyShortCircuit = true;
+    state.finalContent = weather.summary;
+    log.debug("weather-only 流程，card_weather 后短路 LLM 续流", {
+      runId: event.run_id,
+      summaryPreview: previewJson(weather.summary),
+    });
+  }
 }
 
 function recommendationTagForVerdict(verdict: string | undefined): string | undefined {

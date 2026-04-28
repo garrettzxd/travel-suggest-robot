@@ -64,7 +64,10 @@ export interface LangChainStreamEvent {
  * - cachedHero / cachedWeatherWithSummary / cachedAttractionsWithDescriptions / cachedRecommendation / cachedChips：
  *   渐进式 TripCard 局部事件缓存，便于日志、互斥与未来兼容完整 card 合成；
  * - finalContent：累积模型输出，结束时一并以 'final' 事件下发；
- * - skippedEmptyChunkCount：模型在 tool_call 拼装期推回的空文本 chunk 计数，stream 结束统一打一行汇总。
+ * - skippedEmptyChunkCount：模型在 tool_call 拼装期推回的空文本 chunk 计数，stream 结束统一打一行汇总；
+ * - weatherOnlyShortCircuit：纯天气查询（仅触发 getWeather + finalizeTripWeather，不进 TripCard 完整流）时，
+ *   card_weather 已经下发了完整的天气数据 + summary，无需再让 LLM 续写一段重复的 markdown 文本。
+ *   置 true 后 route.ts 主循环会立刻 break 并 abort agent stream，直接走 final + done。
  */
 export interface ChatStreamState {
   startedToolCalls: Set<string>;
@@ -85,6 +88,7 @@ export interface ChatStreamState {
   attractionsSummaryEmitted: boolean;
   finalContent: string;
   skippedEmptyChunkCount: number;
+  weatherOnlyShortCircuit: boolean;
 }
 
 /** 工厂方法：单轮请求开始时创建一个全新的可变状态。 */
@@ -108,5 +112,6 @@ export function createInitialState(): ChatStreamState {
     attractionsSummaryEmitted: false,
     finalContent: "",
     skippedEmptyChunkCount: 0,
+    weatherOnlyShortCircuit: false,
   };
 }

@@ -26,6 +26,8 @@ export interface ToolTraceEntry {
  *   ChatPage 据此决定渲染结构化卡片还是降级到 MarkdownTyping。
  * - hasToolStart 标记本轮是否已收到任一 tool_start：用于区分"闲聊（无工具）"与"卡片流"，
  *   闲聊场景仍走 markdown bubble，不渲染卡片骨架。
+ * - toolsStarted 累积本轮所有 tool_start 的工具名（仅 getWeather / getAttractions 会真的下发），
+ *   TripCardView 据此决定是否为对应槽位预留骨架，避免"只查天气也展示空地点/景点/出行建议"。
  */
 export interface TravelChatMessage {
   id: string;
@@ -38,6 +40,7 @@ export interface TravelChatMessage {
   card?: TripCard;
   itinerary?: Itinerary;
   hasToolStart?: boolean;
+  toolsStarted?: ToolName[];
 }
 
 /** 解析单个 SSE frame，兼容多行 data 字段并在 JSON 解析失败时保留原文。 */
@@ -282,11 +285,21 @@ export function useTravelAgent() {
             ...prev,
             { name: payload.name, status: 'running', args: payload.args },
           ]);
-          // tool_start 标记 → ChatPage 据此判断切换到卡片流（PRD §7.5）。
+          // tool_start 标记 → ChatPage 据此判断切换到卡片流（PRD §7.5）；
+          // toolsStarted 同时累加工具名，TripCardView 用它裁剪槽位渲染。
           setMessages((prev) =>
-            patchAssistantMessage(prev, assistantMessageId, {
-              hasToolStart: true,
-              status: 'updating',
+            prev.map((entry) => {
+              if (entry.id !== assistantMessageId || entry.role !== 'assistant') return entry;
+              const prevTools = entry.toolsStarted ?? [];
+              const toolsStarted = prevTools.includes(payload.name)
+                ? prevTools
+                : [...prevTools, payload.name];
+              return {
+                ...entry,
+                hasToolStart: true,
+                toolsStarted,
+                status: 'updating',
+              };
             }),
           );
           continue;

@@ -55,7 +55,10 @@
       "Bash(node -e ' *)",
       "Bash(pnpm --filter @travel/web exec tsc --noEmit)",
       "Bash(pnpm --filter @travel/server exec tsc --noEmit)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d['scripts'], indent=2, ensure_ascii=False\\)\\)\")",
+      "Bash(pnpm --filter @travel/web typecheck)",
+      "Bash(pnpm --filter @travel/server typecheck)"
     ]
   }
 }

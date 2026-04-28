@@ -208,6 +208,20 @@ function MessageRow({
 
   if (message.hasToolStart || hasTripCardData) {
     const settled = message.status === 'success';
+    // 仅 weather-only（没进 finalizeTripCard 渐进流，且工具集合里只有 getWeather）时，
+    // 把 final 文本回填到 WeatherCard 的"整体评估"槽，避免 narrative 被吞掉。
+    const onlyWeatherTool =
+      !!message.toolsStarted &&
+      message.toolsStarted.length > 0 &&
+      message.toolsStarted.every((name) => name === 'getWeather');
+    // inCardFlow 必须按 hero / recommendation 判定，否则 weather-only 流的 progressiveCard.weather 也会误判。
+    const inCardFlow = !!(
+      message.card ||
+      message.progressiveCard?.hero ||
+      message.progressiveCard?.recommendation
+    );
+    const fallbackNarrative =
+      onlyWeatherTool && !inCardFlow && message.content ? message.content : undefined;
     return (
       <div className="travel-assistant-message">
         <AssistantHeader time={time} />
@@ -218,6 +232,8 @@ function MessageRow({
           progressiveCard={message.progressiveCard}
           settled={settled}
           onChipClick={onChipClick}
+          toolsStarted={message.toolsStarted}
+          fallbackNarrative={fallbackNarrative}
         />
       </div>
     );
