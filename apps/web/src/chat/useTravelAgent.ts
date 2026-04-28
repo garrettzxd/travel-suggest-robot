@@ -5,6 +5,7 @@ import type {
   ChatMessage,
   ChatRequest,
   Itinerary,
+  ProgressiveTripCard,
   ToolName,
   TripCard,
   WeatherSnapshot,
@@ -21,7 +22,7 @@ export interface ToolTraceEntry {
 
 /**
  * 单条聊天消息。
- * - assistant 消息可携带 weather / attractions / card / itinerary 四类结构化数据，
+ * - assistant 消息可携带 weather / attractions / progressiveCard / card / itinerary 五类结构化数据，
  *   ChatPage 据此决定渲染结构化卡片还是降级到 MarkdownTyping。
  * - hasToolStart 标记本轮是否已收到任一 tool_start：用于区分"闲聊（无工具）"与"卡片流"，
  *   闲聊场景仍走 markdown bubble，不渲染卡片骨架。
@@ -33,6 +34,7 @@ export interface TravelChatMessage {
   status?: 'local' | 'loading' | 'updating' | 'success' | 'error' | 'abort';
   weather?: WeatherSnapshot;
   attractions?: Attraction[];
+  progressiveCard?: ProgressiveTripCard;
   card?: TripCard;
   itinerary?: Itinerary;
   hasToolStart?: boolean;
@@ -92,7 +94,7 @@ async function* readSseFrames(stream: ReadableStream<Uint8Array>) {
 
 /**
  * 给已经渲染过 TripCard 的 assistant 历史回合合成一条"已完成"摘要。
- * - prompt 让 LLM 调完 finalizeTripCard 后空字符串收尾，导致 history 里 content="";
+ * - prompt 让 LLM 调完 TripCard 内部工具链后空字符串收尾，导致 history 里 content="";
  *   下游 LLM 看到空 assistant 回合会误以为上一轮没完成，对历史地名重复调工具。
  * - 这里把空 content + 有结构化数据的 assistant 消息替换成 "[已为「xxx」生成行程卡...]"，
  *   让模型清楚那一轮已收口，新一轮只需处理当前用户消息。
@@ -104,6 +106,11 @@ function summarizeAssistantTurn(message: TravelChatMessage): string {
   if (message.card) {
     const city = message.card.hero.city || message.card.hero.regionPath || '上一目的地';
     return `[已为「${city}」生成完整行程卡（含天气、${message.card.attractions.length} 条景点、出行建议）。请勿为该地名重复调用工具。]`;
+  }
+  if (message.progressiveCard?.hero && message.progressiveCard.attractions) {
+    const city =
+      message.progressiveCard.hero.city || message.progressiveCard.hero.regionPath || '上一目的地';
+    return `[已为「${city}」生成完整行程卡（含天气、${message.progressiveCard.attractions.length} 条景点、出行建议）。请勿为该地名重复调用工具。]`;
   }
   if (message.itinerary) {
     const title = message.itinerary.title || '上一目的地';
@@ -169,9 +176,49 @@ function patchAssistantMessage(
   );
 }
 
+/** 渐进式 TripCard 数据齐备后合成旧 TripCard，保持历史摘要与旧渲染路径兼容。 */
+function tryBuildCardFromProgressive(progressiveCard: ProgressiveTripCard): TripCard | undefined {
+  if (
+    !progressiveCard.hero ||
+    !progressiveCard.attractions ||
+    !progressiveCard.recommendation ||
+    !progressiveCard.chips
+  ) {
+    return undefined;
+  }
+
+  return {
+    hero: progressiveCard.hero,
+    ...(progressiveCard.weather ? { weather: progressiveCard.weather } : {}),
+    attractions: progressiveCard.attractions,
+    recommendation: progressiveCard.recommendation,
+    chips: progressiveCard.chips,
+  };
+}
+
+/** 对当前 assistant 消息做局部 TripCard patch，并在可能时同步合成完整 card。 */
+function patchProgressiveCard(
+  messages: TravelChatMessage[],
+  id: string,
+  patch: ProgressiveTripCard,
+): TravelChatMessage[] {
+  return messages.map((entry) => {
+    if (entry.id !== id || entry.role !== 'assistant') return entry;
+    const progressiveCard = { ...entry.progressiveCard, ...patch };
+    const card = tryBuildCardFromProgressive(progressiveCard) ?? entry.card;
+    return {
+      ...entry,
+      progressiveCard,
+      ...(card ? { card } : {}),
+      status: 'updating',
+    };
+  });
+}
+
 /**
  * useTravelAgent：封装聊天请求、SSE 消费、消息状态、工具进度，以及 PRD §7 引入的
- * 三种结构化数据（weather / attractions / card）。返回的 messages 直接给 ChatPage 渲染。
+ * 结构化数据（weather / attractions / progressiveCard / card / itinerary）。
+ * 返回的 messages 直接给 ChatPage 渲染。
  */
 export function useTravelAgent() {
   const [messages, setMessages] = useState<TravelChatMessage[]>([]);
@@ -181,7 +228,7 @@ export function useTravelAgent() {
 
   /**
    * 发送用户输入并把服务端 SSE 事件增量合并到当前 assistant 消息。
-   * 每个 tool_end / card 事件都会就地 patch assistant 消息，使 ChatPage 能根据数据可用性
+   * 每个 tool_end / card_* 事件都会就地 patch assistant 消息，使 ChatPage 能根据数据可用性
    * 决定 TripCardView 各子卡的骨架/裸数据/完整态。
    */
   async function onRequest(input: string) {
@@ -273,6 +320,42 @@ export function useTravelAgent() {
           if (card) {
             setMessages((prev) =>
               patchAssistantMessage(prev, assistantMessageId, { card }),
+            );
+          }
+          continue;
+        }
+
+        if (event === 'card_destination') {
+          const hero = (data as { hero?: TripCard['hero'] }).hero;
+          if (hero) {
+            setMessages((prev) => patchProgressiveCard(prev, assistantMessageId, { hero }));
+          }
+          continue;
+        }
+
+        if (event === 'card_weather') {
+          const weather = (data as { weather?: WeatherSnapshot & { summary: string } }).weather;
+          if (weather) {
+            setMessages((prev) =>
+              patchProgressiveCard(prev, assistantMessageId, { weather }),
+            );
+          }
+          continue;
+        }
+
+        if (event === 'card_attractions_summary') {
+          const payload = data as {
+            attractions?: Attraction[];
+            recommendation?: TripCard['recommendation'];
+            chips?: string[];
+          };
+          if (payload.attractions && payload.recommendation && payload.chips) {
+            setMessages((prev) =>
+              patchProgressiveCard(prev, assistantMessageId, {
+                attractions: payload.attractions,
+                recommendation: payload.recommendation,
+                chips: payload.chips,
+              }),
             );
           }
           continue;

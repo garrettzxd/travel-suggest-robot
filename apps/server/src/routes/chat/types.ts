@@ -1,7 +1,7 @@
 // chat 路由的 Zod 校验 schema、跨模块共享类型、以及单轮请求的可变状态结构。
 // 拆分自原 routes/chat.types.ts + chat.ts 顶部的 LangChainStreamEvent 接口。
 import { z } from "zod";
-import type { Attraction, ToolName, WeatherSnapshot } from "@travel/shared";
+import type { Attraction, ToolName, TripCard, WeatherSnapshot } from "@travel/shared";
 
 /** POST /api/chat 的请求体。history 允许缺省为空数组，避免首轮对话被挡。 */
 export const ChatRequestSchema = z.object({
@@ -60,7 +60,9 @@ export interface LangChainStreamEvent {
  * - emittedPublicTools：单轮内同名公开工具最多 emit 一次，避免 LLM 并行调多次污染前端状态；
  * - emittedToolStartRunIds：start 阶段成功 emit 的 run_id；end 阶段以此判断是否要落 cache + emit；
  * - cardEmitted / itineraryEmitted：单轮内只允许一张结构化卡片；
- * - cachedWeather / cachedAttractions：finalizeTripCard 收尾时合并 TripCard 用；
+ * - cachedWeather / cachedAttractions：TripCard narrative 工具收尾时合并局部卡片用；
+ * - cachedHero / cachedWeatherWithSummary / cachedAttractionsWithDescriptions / cachedRecommendation / cachedChips：
+ *   渐进式 TripCard 局部事件缓存，便于日志、互斥与未来兼容完整 card 合成；
  * - finalContent：累积模型输出，结束时一并以 'final' 事件下发；
  * - skippedEmptyChunkCount：模型在 tool_call 拼装期推回的空文本 chunk 计数，stream 结束统一打一行汇总。
  */
@@ -73,6 +75,14 @@ export interface ChatStreamState {
   itineraryEmitted: boolean;
   cachedWeather: WeatherSnapshot | undefined;
   cachedAttractions: Attraction[] | undefined;
+  cachedHero: TripCard["hero"] | undefined;
+  cachedWeatherWithSummary: (WeatherSnapshot & { summary: string }) | undefined;
+  cachedAttractionsWithDescriptions: Attraction[] | undefined;
+  cachedRecommendation: TripCard["recommendation"] | undefined;
+  cachedChips: string[] | undefined;
+  destinationEmitted: boolean;
+  weatherSummaryEmitted: boolean;
+  attractionsSummaryEmitted: boolean;
   finalContent: string;
   skippedEmptyChunkCount: number;
 }
@@ -88,6 +98,14 @@ export function createInitialState(): ChatStreamState {
     itineraryEmitted: false,
     cachedWeather: undefined,
     cachedAttractions: undefined,
+    cachedHero: undefined,
+    cachedWeatherWithSummary: undefined,
+    cachedAttractionsWithDescriptions: undefined,
+    cachedRecommendation: undefined,
+    cachedChips: undefined,
+    destinationEmitted: false,
+    weatherSummaryEmitted: false,
+    attractionsSummaryEmitted: false,
     finalContent: "",
     skippedEmptyChunkCount: 0,
   };

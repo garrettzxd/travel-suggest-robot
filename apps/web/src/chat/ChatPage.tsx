@@ -114,11 +114,12 @@ export default function ChatPage() {
   const { messages, onRequest, isRequesting } = useTravelAgent();
   const [inputValue, setInputValue] = useState('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const shouldStickToBottomRef = useRef(true);
 
-  // 新消息进来时自动滚到底部，避免用户错过流式更新。
+  // 只有用户本来就在底部附近时才自动跟随流式更新；用户上滑查看卡片时保持当前位置。
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || !shouldStickToBottomRef.current) return;
     el.scrollTop = el.scrollHeight;
   }, [messages]);
 
@@ -133,8 +134,17 @@ export default function ChatPage() {
   const handleSubmit = (value: string) => {
     const text = value.trim();
     if (!text) return;
+    shouldStickToBottomRef.current = true;
     setInputValue('');
     onRequest(text);
+  };
+
+  /** 记录用户是否仍贴近底部，用于决定后续流式数据是否需要自动滚动。 */
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceToBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    shouldStickToBottomRef.current = distanceToBottom < 96;
   };
 
   return (
@@ -156,6 +166,7 @@ export default function ChatPage() {
 
       <div
         ref={scrollRef}
+        onScroll={handleScroll}
         style={{
           flex: 1,
           overflowY: 'auto',
@@ -173,13 +184,13 @@ export default function ChatPage() {
           }}
         >
           {messages.length === 0 ? (
-            <WelcomeCard onSuggestionClick={onRequest} />
+            <WelcomeCard onSuggestionClick={handleSubmit} />
           ) : (
             messages.map((message) => (
               <MessageRow
                 key={message.id}
                 message={message}
-                onChipClick={onRequest}
+                onChipClick={handleSubmit}
               />
             ))
           )}
@@ -216,7 +227,12 @@ function MessageRow({
   }
 
   const time = deriveMessageTime(message.id);
-  const hasTripCardData = !!(message.weather || message.attractions || message.card);
+  const hasTripCardData = !!(
+    message.weather ||
+    message.attractions ||
+    message.progressiveCard ||
+    message.card
+  );
   const hasStructured = !!(hasTripCardData || message.itinerary);
 
   // error：使用红色 Bubble 单独展示。
@@ -278,6 +294,7 @@ function MessageRow({
           weather={message.weather}
           attractions={message.attractions}
           card={message.card}
+          progressiveCard={message.progressiveCard}
           settled={settled}
           onChipClick={onChipClick}
         />

@@ -1,16 +1,25 @@
 // LangGraph streamEvents 三类事件的处理器：模型 token 流、tool_start、tool_end。
 // route.ts 主循环按 event.event 分派到这三个 handler，handler 共享 ChatStreamState。
-import type { Attraction, Itinerary, WeatherSnapshot } from "@travel/shared";
+import type { Attraction, Itinerary, TripCard, WeatherSnapshot } from "@travel/shared";
 import type { ChatRouteLogger } from "./logger.js";
 import { extractTextDelta, extractToolResult, normalizeToolPayload } from "./streamParsers.js";
 import {
   isFinalizeInput,
+  isInternalToolName,
   isPublicToolName,
   isRecommendItineraryInput,
+  isTripAttractionsSummaryInput,
+  isTripDestinationInput,
+  isTripWeatherInput,
   toolLabel,
 } from "./toolMeta.js";
 import { previewJson } from "./logger.js";
-import { buildTripCard } from "./tripCard.js";
+import {
+  buildTripCard,
+  buildTripHero,
+  buildTripWeather,
+  mergeAttractionDescriptions,
+} from "./tripCard.js";
 import type { ChatStreamState, EventWriter, LangChainStreamEvent } from "./types.js";
 
 /** handlers 共用的依赖：emit 与 logger，避免每个函数签名带一长串参数。 */
@@ -44,7 +53,7 @@ export function handleModelStream(
 
 /**
  * 处理 `on_tool_start` 事件：
- * - 内部工具（finalizeTripCard / recommendItinerary）不向前端 emit；
+ * - 内部工具（finalizeTrip* / recommendItinerary）不向前端 emit；
  * - 公开工具按 run_id 去重，并在单轮内做"同名工具仅放过第一次"的硬限制；
  * - 通过的调用以 'tool_start' SSE 事件下发，并把 run_id 标到 emittedToolStartRunIds，
  *   供 handleToolEnd 决定是否要落 cache + emit 对应的 'tool_end'。
@@ -55,7 +64,7 @@ export function handleToolStart(
   { emitEvent, log }: HandlerDeps,
 ): void {
   // 内部工具不对外暴露 tool_start。
-  if (event.name === "finalizeTripCard" || event.name === "recommendItinerary") {
+  if (isInternalToolName(event.name)) {
     log.debug("内部工具启动（不下发）", { toolName: event.name, runId: event.run_id });
     return;
   }
@@ -94,7 +103,8 @@ export function handleToolStart(
 /**
  * 处理 `on_tool_end` 事件：按工具名分派到三个内部分支函数。
  * - recommendItinerary → emit 'itinerary'
- * - finalizeTripCard → 合并 weather + attractions + narrative → emit 'card'
+ * - finalizeTripDestination / finalizeTripWeather / finalizeTripAttractionsSummary → emit 渐进式 card_* 事件
+ * - finalizeTripCard → 保留兼容，合并 weather + attractions + narrative → emit 'card'
  * - 公开工具（getWeather / getAttractions） → 写 cache + emit 'tool_end'
  */
 export function handleToolEnd(
@@ -108,6 +118,18 @@ export function handleToolEnd(
   }
   if (event.name === "finalizeTripCard") {
     handleFinalizeTripCardEnd(event, state, deps);
+    return;
+  }
+  if (event.name === "finalizeTripDestination") {
+    handleFinalizeTripDestinationEnd(event, state, deps);
+    return;
+  }
+  if (event.name === "finalizeTripWeather") {
+    handleFinalizeTripWeatherEnd(event, state, deps);
+    return;
+  }
+  if (event.name === "finalizeTripAttractionsSummary") {
+    handleFinalizeTripAttractionsSummaryEnd(event, state, deps);
     return;
   }
   if (isPublicToolName(event.name)) {
@@ -158,6 +180,188 @@ function handleRecommendItineraryEnd(
     }),
   });
   emitEvent("itinerary", { itinerary });
+}
+
+/**
+ * finalizeTripDestination 结束：补齐后端可信字段后 emit 'card_destination'。
+ * 此事件一旦下发，代表本轮已进入 TripCard 分支，后续 itinerary 会被互斥抑制。
+ */
+function handleFinalizeTripDestinationEnd(
+  event: LangChainStreamEvent,
+  state: ChatStreamState,
+  { emitEvent, log }: HandlerDeps,
+): void {
+  if (state.completedToolCalls.has(event.run_id)) {
+    return;
+  }
+  state.completedToolCalls.add(event.run_id);
+  if (state.destinationEmitted || state.itineraryEmitted) {
+    log.warn("finalizeTripDestination 在单轮内重复触发或与 itinerary 冲突，已忽略", {
+      runId: event.run_id,
+      destinationEmitted: state.destinationEmitted,
+      itineraryEmitted: state.itineraryEmitted,
+    });
+    return;
+  }
+
+  const destination = extractToolResult(event.data?.output);
+  if (!isTripDestinationInput(destination)) {
+    log.warn("finalizeTripDestination 返回体不合法，跳过地点事件", {
+      runId: event.run_id,
+      preview: previewJson(destination),
+    });
+    return;
+  }
+  if (!state.cachedAttractions) {
+    log.warn("缺少 attractions 裸数据，无法生成地点 Hero", {
+      hasWeather: !!state.cachedWeather,
+      hasAttractions: !!state.cachedAttractions,
+    });
+    return;
+  }
+
+  const hero = buildTripHero(destination, state.cachedWeather, state.cachedAttractions);
+  state.cachedHero = hero;
+  state.destinationEmitted = true;
+  state.cardEmitted = true;
+  log.toolResult(toolLabel("finalizeTripDestination"), {
+    toolCallId: event.run_id,
+    toolName: "finalizeTripDestination",
+    resultPreview: previewJson({
+      city: hero.city,
+      regionPath: hero.regionPath,
+      verdict: hero.verdictBadge,
+      hasHeroImage: !!hero.heroImageUrl,
+    }),
+  });
+  emitEvent("card_destination", { hero });
+}
+
+/**
+ * finalizeTripWeather 结束：把 summary 合并进缓存的 WeatherSnapshot 后 emit 'card_weather'。
+ * weather 裸数据缺失时静默降级，不编造天气 summary。
+ */
+function handleFinalizeTripWeatherEnd(
+  event: LangChainStreamEvent,
+  state: ChatStreamState,
+  { emitEvent, log }: HandlerDeps,
+): void {
+  if (state.completedToolCalls.has(event.run_id)) {
+    return;
+  }
+  state.completedToolCalls.add(event.run_id);
+  if (state.weatherSummaryEmitted || state.itineraryEmitted) {
+    log.warn("finalizeTripWeather 在单轮内重复触发或与 itinerary 冲突，已忽略", {
+      runId: event.run_id,
+      weatherSummaryEmitted: state.weatherSummaryEmitted,
+      itineraryEmitted: state.itineraryEmitted,
+    });
+    return;
+  }
+
+  const weatherNarrative = extractToolResult(event.data?.output);
+  if (!isTripWeatherInput(weatherNarrative)) {
+    log.warn("finalizeTripWeather 返回体不合法，跳过天气总结事件", {
+      runId: event.run_id,
+      preview: previewJson(weatherNarrative),
+    });
+    return;
+  }
+
+  const weather = buildTripWeather(state.cachedWeather, weatherNarrative);
+  if (!weather) {
+    log.debug("getWeather 缺失，跳过 card_weather 事件");
+    return;
+  }
+
+  state.cachedWeatherWithSummary = weather;
+  state.weatherSummaryEmitted = true;
+  state.cardEmitted = true;
+  log.toolResult(toolLabel("finalizeTripWeather"), {
+    toolCallId: event.run_id,
+    toolName: "finalizeTripWeather",
+    resultPreview: previewJson({
+      location: weather.location,
+      summary: weather.summary,
+    }),
+  });
+  emitEvent("card_weather", { weather });
+}
+
+function recommendationTagForVerdict(verdict: string | undefined): string | undefined {
+  if (verdict === "good") return "推荐 · 近期出发";
+  if (verdict === "caution") return "谨慎 · 建议调整";
+  if (verdict === "avoid") return "不建议 · 近期出发";
+  return undefined;
+}
+
+function normalizeRecommendation(
+  recommendation: TripCard["recommendation"],
+  hero: TripCard["hero"] | undefined,
+): TripCard["recommendation"] {
+  const tag = recommendationTagForVerdict(hero?.verdictBadge);
+  return tag ? { ...recommendation, tag } : recommendation;
+}
+
+/**
+ * finalizeTripAttractionsSummary 结束：合并景点 description，并 emit 出行建议与 chips。
+ * 这是 TripCard 渐进链路的最后一段，但 weather 允许缺失。
+ */
+function handleFinalizeTripAttractionsSummaryEnd(
+  event: LangChainStreamEvent,
+  state: ChatStreamState,
+  { emitEvent, log }: HandlerDeps,
+): void {
+  if (state.completedToolCalls.has(event.run_id)) {
+    return;
+  }
+  state.completedToolCalls.add(event.run_id);
+  if (state.attractionsSummaryEmitted || state.itineraryEmitted) {
+    log.warn("finalizeTripAttractionsSummary 在单轮内重复触发或与 itinerary 冲突，已忽略", {
+      runId: event.run_id,
+      attractionsSummaryEmitted: state.attractionsSummaryEmitted,
+      itineraryEmitted: state.itineraryEmitted,
+    });
+    return;
+  }
+
+  const summary = extractToolResult(event.data?.output);
+  if (!isTripAttractionsSummaryInput(summary)) {
+    log.warn("finalizeTripAttractionsSummary 返回体不合法，跳过景点与总结事件", {
+      runId: event.run_id,
+      preview: previewJson(summary),
+    });
+    return;
+  }
+  if (!state.cachedAttractions) {
+    log.warn("缺少 attractions 裸数据，无法生成景点描述与出行建议", {
+      hasWeather: !!state.cachedWeather,
+      hasAttractions: !!state.cachedAttractions,
+    });
+    return;
+  }
+
+  const attractions = mergeAttractionDescriptions(state.cachedAttractions, summary);
+  const recommendation = normalizeRecommendation(summary.recommendation, state.cachedHero);
+  state.cachedAttractionsWithDescriptions = attractions;
+  state.cachedRecommendation = recommendation;
+  state.cachedChips = summary.chips;
+  state.attractionsSummaryEmitted = true;
+  state.cardEmitted = true;
+  log.toolResult(toolLabel("finalizeTripAttractionsSummary"), {
+    toolCallId: event.run_id,
+    toolName: "finalizeTripAttractionsSummary",
+    resultPreview: previewJson({
+      attractions: attractions.length,
+      recommendationTag: recommendation.tag,
+      chips: summary.chips.length,
+    }),
+  });
+  emitEvent("card_attractions_summary", {
+    attractions,
+    recommendation,
+    chips: summary.chips,
+  });
 }
 
 /**

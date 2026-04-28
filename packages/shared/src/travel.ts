@@ -79,7 +79,7 @@ export interface TravelVerdict {
 
 /**
  * 一张完整的「行程卡」。由 chat 路由把 getWeather / getAttractions 的裸数据
- * 与 finalizeTripCard 工具输出的 narrative 字段合并而成，前端据此一次性渲染
+ * 与 TripCard narrative 工具输出的字段合并而成，前端据此渲染
  * 地点 Hero / 天气 / 景点 / 出行建议四张子卡。
  */
 export interface TripCard {
@@ -120,6 +120,24 @@ export interface TripCard {
   };
   /** 四条后续追问建议 chip，恰好 4 条 */
   chips: string[];
+}
+
+/**
+ * TripCard 渐进式下发过程中的局部数据。
+ * 前端用它在完整 TripCard 合成前分批填充各子卡；字段形状全部复用 TripCard，
+ * 避免子组件为渐进事件额外维护一套 props。
+ */
+export interface ProgressiveTripCard {
+  /** `card_destination` 事件产出的地点 Hero。 */
+  hero?: TripCard['hero'];
+  /** `card_weather` 事件产出的天气裸数据 + summary。 */
+  weather?: WeatherSnapshot & { summary: string };
+  /** `card_attractions_summary` 事件产出的已补 description 景点。 */
+  attractions?: Attraction[];
+  /** `card_attractions_summary` 事件产出的出行建议。 */
+  recommendation?: TripCard['recommendation'];
+  /** `card_attractions_summary` 事件产出的后续追问 chips。 */
+  chips?: string[];
 }
 
 /**

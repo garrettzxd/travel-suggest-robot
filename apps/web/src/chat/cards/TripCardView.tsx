@@ -3,7 +3,7 @@ import { DestinationHero } from './DestinationHero';
 import { WeatherCard } from './WeatherCard';
 import { AttractionList } from './AttractionList';
 import { RecommendationPanel } from './RecommendationPanel';
-import type { Attraction, TripCard, WeatherSnapshot } from '../../types';
+import type { Attraction, ProgressiveTripCard, TripCard, WeatherSnapshot } from '../../types';
 import { colors, radius, spacing } from '../../theme/tokens';
 
 /** TripCardView Props（PRD §7.3.7）。 */
@@ -14,6 +14,8 @@ export interface TripCardViewProps {
   attractions?: Attraction[];
   /** finalizeTripCard 合并后的完整 TripCard；narrative 字段优先取自这里。 */
   card?: TripCard;
+  /** 渐进式 TripCard 局部事件累积出的数据。 */
+  progressiveCard?: ProgressiveTripCard;
   /**
    * 本轮回复是否已完结（final 或 done 已到达）。
    * 用于把"还在等"的骨架切到"等不到了"的静态空态——
@@ -105,16 +107,17 @@ export function TripCardView({
   weather,
   attractions,
   card,
+  progressiveCard,
   settled,
   onChipClick,
 }: TripCardViewProps) {
-  const heroData = card?.hero;
-  const weatherData = card?.weather ?? weather;
+  const heroData = card?.hero ?? progressiveCard?.hero;
+  const weatherData = card?.weather ?? progressiveCard?.weather ?? weather;
   // card.weather 整段可缺失（getWeather 失败兜底），summary 用可选链即可。
-  const weatherSummary = card?.weather?.summary;
-  const attractionItems = card?.attractions ?? attractions;
-  const recommendationData = card?.recommendation;
-  const chips = card?.chips;
+  const weatherSummary = card?.weather?.summary ?? progressiveCard?.weather?.summary;
+  const attractionItems = card?.attractions ?? progressiveCard?.attractions ?? attractions;
+  const recommendationData = card?.recommendation ?? progressiveCard?.recommendation;
+  const chips = card?.chips ?? progressiveCard?.chips;
   // chips 跟 recommendation 同源（card.chips），所以 chips 的 loading/empty 与之联动。
   const chipsLoading = !chips && !settled;
 
