@@ -1,0 +1,87 @@
+.travel-recommendation__empty {
+  padding: var(--travel-space-md) 0;
+  color: var(--travel-color-ink-subtle);
+  font-size: 13px;
+  text-align: center;
+}
+
+.travel-recommendation__skeleton,
+.travel-recommendation__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--travel-space-sm);
+}
+
+.travel-recommendation__skeleton-head,
+.travel-recommendation__head {
+  display: flex;
+  align-items: center;
+  gap: var(--travel-space-sm);
+}
+
+.travel-recommendation__skeleton-pill {
+  width: 110px !important;
+  height: 22px !important;
+  border-radius: var(--travel-radius-chip) !important;
+}
+
+.travel-recommendation__skeleton-title {
+  width: 140px !important;
+  height: 22px !important;
+}
+
+.travel-recommendation__pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--travel-radius-chip);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.travel-recommendation__pill.is-default,
+.travel-recommendation__pill.is-good {
+  background: var(--travel-verdict-good-bg);
+  color: var(--travel-verdict-good-fg);
+}
+
+.travel-recommendation__pill.is-caution {
+  background: var(--travel-verdict-caution-bg);
+  color: var(--travel-verdict-caution-fg);
+}
+
+.travel-recommendation__pill.is-avoid {
+  background: var(--travel-verdict-avoid-bg);
+  color: var(--travel-verdict-avoid-fg);
+}
+
+.travel-recommendation__pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.travel-recommendation__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--travel-color-ink);
+  line-height: 1.35;
+}
+
+.travel-recommendation__body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--travel-color-ink);
+}
+
+.travel-recommendation__date-mark {
+  background: var(--travel-color-date-highlight);
+  color: var(--travel-color-ink);
+  padding: 0 4px;
+  border-radius: 3px;
+}

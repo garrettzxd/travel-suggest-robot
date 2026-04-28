@@ -1,0 +1,78 @@
+.travel-chat-page {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: column;
+  background: var(--travel-color-bg);
+}
+
+.travel-chat-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: var(--travel-layout-input-pad-bottom);
+}
+
+.travel-chat-content {
+  max-width: var(--travel-layout-content-max-width);
+  margin: 0 auto;
+  padding: var(--travel-space-lg) var(--travel-space-md) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--travel-space-lg);
+}
+
+.travel-user-message {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.travel-user-bubble {
+  background: var(--travel-color-user-bubble);
+  color: var(--travel-color-surface);
+  padding: 10px 14px;
+  border-radius: 14px;
+  max-width: 70%;
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.travel-assistant-header {
+  display: flex;
+  align-items: center;
+  gap: var(--travel-space-sm);
+  margin-bottom: var(--travel-space-xs);
+}
+
+.travel-assistant-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--travel-color-ink);
+  color: var(--travel-color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.travel-assistant-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--travel-color-ink);
+}
+
+.travel-assistant-time {
+  font-size: 12px;
+  color: var(--travel-color-ink-muted);
+}
+
+.travel-error-bubble {
+  .ant-bubble-content {
+    background: var(--travel-color-avoid-soft);
+    color: var(--travel-color-avoid);
+    border-radius: var(--travel-radius-card);
+  }
+}

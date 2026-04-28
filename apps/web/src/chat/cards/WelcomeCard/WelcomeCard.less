@@ -1,0 +1,120 @@
+.travel-welcome-header {
+  display: flex;
+  align-items: center;
+  gap: var(--travel-space-sm);
+}
+
+.travel-welcome-header__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--travel-color-ink);
+  color: var(--travel-color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.travel-welcome-header__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--travel-color-ink);
+}
+
+.travel-welcome-header__time {
+  font-size: 12px;
+  color: var(--travel-color-ink-muted);
+}
+
+.travel-welcome__intro {
+  margin-top: var(--travel-space-md);
+  margin-bottom: 0;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--travel-color-ink);
+}
+
+.travel-welcome__capabilities {
+  display: flex;
+  gap: var(--travel-space-sm);
+  margin-top: var(--travel-space-md);
+  flex-wrap: wrap;
+}
+
+.travel-welcome-capability {
+  flex: 1;
+  min-width: 0;
+}
+
+.travel-welcome-capability.is-pink {
+  color: var(--travel-tag-pink-fg);
+}
+
+.travel-welcome-capability.is-blue {
+  color: var(--travel-tag-blue-fg);
+}
+
+.travel-welcome-capability.is-sand {
+  color: var(--travel-tag-sand-fg);
+}
+
+.travel-welcome-capability__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--travel-space-sm);
+}
+
+.travel-welcome-capability__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.travel-welcome-capability__copy {
+  min-width: 0;
+}
+
+.travel-welcome-capability__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.travel-welcome-capability__subtitle {
+  font-size: 12px;
+  opacity: 0.78;
+  margin-top: 2px;
+}
+
+.travel-welcome__hint {
+  margin-top: var(--travel-space-md);
+  border-top: 1px dashed var(--travel-color-stroke);
+  padding-top: var(--travel-space-sm);
+  font-size: 13px;
+  color: var(--travel-color-ink-muted);
+}
+
+.travel-welcome__suggestions {
+  margin-top: var(--travel-space-sm);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--travel-space-xs);
+}
+
+.travel-welcome__suggestion {
+  border: 1px solid var(--travel-color-stroke);
+  background: var(--travel-color-surface);
+  color: var(--travel-color-ink);
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: var(--travel-radius-chip);
+  cursor: pointer;
+}

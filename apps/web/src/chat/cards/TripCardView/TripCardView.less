@@ -1,0 +1,29 @@
+.travel-trip-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--travel-space-sm);
+}
+
+.travel-trip-card__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--travel-space-xs);
+  padding: 0 var(--travel-space-xxs);
+}
+
+.travel-trip-card__chip-skeleton {
+  height: 30px !important;
+  border-radius: var(--travel-radius-chip) !important;
+  width: 140px !important;
+}
+
+.travel-trip-card__chip {
+  border: 1px solid var(--travel-color-stroke);
+  background: var(--travel-color-surface);
+  color: var(--travel-color-ink);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: var(--travel-radius-chip);
+  cursor: pointer;
+  line-height: 1.4;
+}

@@ -3,13 +3,13 @@ import { Bubble } from '@ant-design/x';
 import type { BubbleProps } from '@ant-design/x';
 import XMarkdown from '@ant-design/x-markdown';
 import { Typography } from 'antd';
-import { TopBar } from './TopBar';
-import { InputBar } from './InputBar';
-import { WelcomeCard } from './cards/WelcomeCard';
-import { TripCardView } from './cards/TripCardView';
-import { ItineraryCard } from './cards/ItineraryCard';
-import { useTravelAgent, type TravelChatMessage } from './useTravelAgent';
-import { colors, layout, radius, spacing } from '../theme/tokens';
+import { TopBar } from '../TopBar';
+import { InputBar } from '../InputBar';
+import { WelcomeCard } from '../cards/WelcomeCard';
+import { TripCardView } from '../cards/TripCardView';
+import { ItineraryCard } from '../cards/ItineraryCard';
+import { useTravelAgent, type TravelChatMessage } from '../useTravelAgent';
+import './ChatPage.less';
 
 const TYPING_STEP = 2;
 const TYPING_INTERVAL = 30;
@@ -39,28 +39,11 @@ const renderMarkdown: BubbleProps['contentRender'] = (content) => (
   <MarkdownTyping content={typeof content === 'string' ? content : String(content ?? '')} />
 );
 
-/**
- * 用户气泡：深墨色底 + 白字，右对齐。直接输出原始文本，不做 Markdown 解析。
- * 这里手写一个简化版，避免 Bubble 默认样式带来的灰色边和气泡尾巴。
- */
+/** 用户气泡：深墨色底 + 白字，右对齐。 */
 function UserBubble({ content }: { content: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-      <div
-        style={{
-          background: colors.userBubble,
-          color: colors.surface,
-          padding: '10px 14px',
-          borderRadius: 14,
-          maxWidth: '70%',
-          fontSize: 14,
-          lineHeight: 1.6,
-          whiteSpace: 'pre-wrap',
-          wordBreak: 'break-word',
-        }}
-      >
-        {content}
-      </div>
+    <div className="travel-user-message">
+      <div className="travel-user-bubble">{content}</div>
     </div>
   );
 }
@@ -68,25 +51,10 @@ function UserBubble({ content }: { content: string }) {
 /** assistant 顶部信息行：圆形头像 + "漫游助手" 名 + 创建时间。 */
 function AssistantHeader({ time }: { time: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs }}>
-      <div
-        style={{
-          width: 28,
-          height: 28,
-          borderRadius: '50%',
-          background: colors.ink,
-          color: colors.surface,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          fontSize: 14,
-          fontWeight: 700,
-        }}
-      >
-        漫
-      </div>
-      <span style={{ fontSize: 13, fontWeight: 600, color: colors.ink }}>漫游助手</span>
-      <span style={{ fontSize: 12, color: colors.inkMuted }}>{time}</span>
+    <div className="travel-assistant-header">
+      <div className="travel-assistant-avatar">漫</div>
+      <span className="travel-assistant-name">漫游助手</span>
+      <span className="travel-assistant-time">{time}</span>
     </div>
   );
 }
@@ -148,15 +116,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div
-      style={{
-        height: '100vh',
-        width: '100vw',
-        display: 'flex',
-        flexDirection: 'column',
-        background: colors.bg,
-      }}
-    >
+    <div className="travel-chat-page">
       <TopBar
         title={deriveTitle(messages)}
         messageCount={messages.length}
@@ -164,25 +124,8 @@ export default function ChatPage() {
         online
       />
 
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          paddingBottom: layout.inputBarPadBottom,
-        }}
-      >
-        <div
-          style={{
-            maxWidth: layout.contentMaxWidth,
-            margin: '0 auto',
-            padding: `${spacing.lg}px ${spacing.md}px 0`,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: spacing.lg,
-          }}
-        >
+      <div ref={scrollRef} onScroll={handleScroll} className="travel-chat-scroll">
+        <div className="travel-chat-content">
           {messages.length === 0 ? (
             <WelcomeCard onSuggestionClick={handleSubmit} />
           ) : (
@@ -209,11 +152,6 @@ export default function ChatPage() {
 
 /**
  * 单条消息分发：user → UserBubble；assistant 视数据可用性走结构化卡片或 markdown 兜底。
- * 切换条件遵循 PRD §7.5：
- *   - loading 且未收到任何 tool_start → "正在思考中..."
- *   - 已收到 tool_start，或已有任何结构化数据 → TripCardView（按可用字段升级）
- *   - 走完未拿到任何结构化数据 → MarkdownTyping fallback
- *   - error → 错误气泡
  */
 function MessageRow({
   message,
@@ -235,60 +173,43 @@ function MessageRow({
   );
   const hasStructured = !!(hasTripCardData || message.itinerary);
 
-  // error：使用红色 Bubble 单独展示。
   if (message.status === 'error') {
     return (
-      <div>
+      <div className="travel-assistant-message travel-assistant-message--error">
         <AssistantHeader time={time} />
         <Bubble
           placement="start"
           variant="outlined"
           content={message.content || '请求失败'}
           contentRender={renderMarkdown}
-          styles={{
-            content: {
-              background: colors.avoidSoft,
-              color: colors.avoid,
-              borderRadius: radius.card,
-            },
-          }}
+          className="travel-error-bubble"
         />
       </div>
     );
   }
 
-  // loading：无任何工具触发，显示纯文本提示（首次 token / final 到达后会切换形态）。
   if (message.status === 'loading' && !hasStructured && !message.hasToolStart) {
     return (
-      <div>
+      <div className="travel-assistant-message">
         <AssistantHeader time={time} />
-        <Bubble
-          placement="start"
-          variant="outlined"
-          loading
-          content=""
-        />
+        <Bubble placement="start" variant="outlined" loading content="" />
       </div>
     );
   }
 
-  // 完整行程规划卡：recommendItinerary 是内部工具，没有 tool_start，收到 itinerary 后直接渲染。
   if (message.itinerary && !message.card) {
     return (
-      <div>
+      <div className="travel-assistant-message">
         <AssistantHeader time={time} />
         <ItineraryCard {...message.itinerary} />
       </div>
     );
   }
 
-  // 进入 TripCard 流：要么已经收到 tool_start，要么已经有 TripCard 相关结构化字段。
-  // settled 在 status 已经收口（success；error 已经在上面分支提前 return）时为 true，
-  // 子卡据此把骨架切静态空态，停止永远转的骨架动画。
   if (message.hasToolStart || hasTripCardData) {
     const settled = message.status === 'success';
     return (
-      <div>
+      <div className="travel-assistant-message">
         <AssistantHeader time={time} />
         <TripCardView
           weather={message.weather}
@@ -302,9 +223,8 @@ function MessageRow({
     );
   }
 
-  // 兜底：纯 markdown 文本回复（闲聊 / 拒绝）。
   return (
-    <div>
+    <div className="travel-assistant-message">
       <AssistantHeader time={time} />
       <Bubble
         placement="start"
