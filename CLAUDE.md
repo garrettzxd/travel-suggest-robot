@@ -45,7 +45,7 @@ travel-suggest-robot/
 
 - [apps/server/src/index.ts](apps/server/src/index.ts) / [apps/server/src/app.ts](apps/server/src/app.ts) — Koa 启动入口与中间件装配。
 - [apps/server/src/agent/](apps/server/src/agent/) — LangGraph agent、system prompt、TripCard / ItineraryCard 工具集。
-- [apps/server/src/routes/](apps/server/src/routes/) — HTTP / SSE 路由，核心聊天接口在 `chat.ts`。
+- [apps/server/src/routes/](apps/server/src/routes/) — HTTP / SSE 路由入口；核心聊天接口在 [apps/server/src/routes/chat/](apps/server/src/routes/chat/) 模块（按能力拆分：route / handlers / sseLifecycle / streamParsers / toolMeta / tripCard / messages / logger / types / legacyUpdatesEmitter）。
 - [apps/server/src/llm/](apps/server/src/llm/) — LLM 客户端与 provider 封装。
 - [apps/server/src/utils/](apps/server/src/utils/) — 日志、SSE 帧写入等通用工具。
 - [apps/server/src/scripts/](apps/server/src/scripts/) — LLM / QWeather 等第三方连通性自检脚本。
@@ -82,7 +82,7 @@ travel-suggest-robot/
 ```
 用户输入
   → apps/web/src/chat/useTravelAgent.ts (POST /chat, 消费 SSE)
-  → apps/server/src/routes/chat.ts (订阅 LangGraph 事件)
+  → apps/server/src/routes/chat/route.ts (订阅 LangGraph 事件，分派给 handlers.ts)
   → apps/server/src/agent/graph.ts (LLM + tools)
        ├─ getWeather      → WeatherSnapshot
        ├─ getAttractions  → Attraction[]

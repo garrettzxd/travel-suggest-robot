@@ -7,7 +7,7 @@ import { bodyParser } from "@koa/bodyparser";
 // @ts-expect-error no types published
 import pinoLogger from "koa-pino-logger";
 import { env } from "./env.js";
-import { chatRoute } from "./routes/chat.js";
+import { chatRoute } from "./routes/chat/index.js";
 
 const app = new Koa();
 

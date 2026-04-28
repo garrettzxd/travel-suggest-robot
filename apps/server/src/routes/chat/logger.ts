@@ -69,4 +69,3 @@ export function previewJson(value: unknown, maxLength = 500): string {
     return "[unserializable]";
   }
 }
-

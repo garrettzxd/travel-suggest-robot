@@ -1,7 +1,8 @@
 // 内部工具：把 getWeather / getAttractions 拿到的裸数据 + LLM 生成的 narrative
 // 一次性打包成一张 TripCard。本工具只负责"收集 narrative 字段"，真正的数据合并
-// 由 apps/server/src/routes/chat.ts 在 on_tool_end:finalizeTripCard 时做，并向前端
-// emit 'card' 事件——所以工具 body 直接把入参 JSON.stringify 后 return 即可。
+// 由 apps/server/src/routes/chat/handlers.ts 的 handleFinalizeTripCardEnd 在
+// on_tool_end:finalizeTripCard 时做，并向前端 emit 'card' 事件——所以工具 body
+// 直接把入参 JSON.stringify 后 return 即可。
 //
 // LangChain 的 OpenAI 兼容转换器处理对象返回值时会把每个字段当作 content block
 // 透传；缺 `type` 字段时 Moonshot 会报 "unknown content type:"。因此即便本工具的

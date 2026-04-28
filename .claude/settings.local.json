@@ -53,7 +53,9 @@
       "Bash(/usr/local/opt/gh/bin/gh --version)",
       "Bash(awk 'length\\($0\\) < 500' /Users/garrettzxd/codes/travel-suggest-robot/plans/2026-04-26/Itinerary-planning.html)",
       "Bash(node -e ' *)",
-      "Bash(pnpm --filter @travel/web exec tsc --noEmit)"
+      "Bash(pnpm --filter @travel/web exec tsc --noEmit)",
+      "Bash(pnpm --filter @travel/server exec tsc --noEmit)",
+      "Bash(echo \"exit=$?\")"
     ]
   }
 }
