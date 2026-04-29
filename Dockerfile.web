@@ -4,11 +4,11 @@ FROM node:24-alpine AS builder
 WORKDIR /app
 RUN corepack enable
 
-COPY package.json pnpm-workspace.yaml tsconfig.base.json ./
+COPY package.json pnpm-workspace.yaml tsconfig.base.json pnpm-lock.yaml .npmrc ./
 COPY packages/shared/package.json packages/shared/
 COPY apps/web/package.json apps/web/
 
-RUN pnpm install
+RUN pnpm install --frozen-lockfile
 
 COPY packages/shared packages/shared
 COPY apps/web apps/web
