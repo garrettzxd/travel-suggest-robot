@@ -163,3 +163,35 @@
   background: currentColor;
   display: inline-block;
 }
+
+/* 移动端 (≤720px)：Hero 高度收一档、标题缩小，verdict 徽章顶对齐。 */
+@media (max-width: 720px) {
+  .travel-destination-hero__media {
+    height: 132px;
+  }
+
+  .travel-destination-hero__body {
+    padding: var(--travel-space-md);
+    align-items: flex-start;
+    gap: var(--travel-space-sm);
+  }
+
+  .travel-destination-hero__title {
+    font-size: 20px;
+    margin: 4px 0;
+  }
+
+  .travel-destination-hero__title.is-empty {
+    font-size: 17px;
+  }
+
+  .travel-destination-hero__desc {
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .travel-verdict-badge {
+    font-size: 11px;
+    padding: 4px 10px;
+  }
+}

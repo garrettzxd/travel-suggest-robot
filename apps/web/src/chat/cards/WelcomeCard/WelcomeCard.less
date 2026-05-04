@@ -118,3 +118,41 @@
   border-radius: var(--travel-radius-chip);
   cursor: pointer;
 }
+
+/* 移动端 (≤720px)：能力卡 icon/文字纵向叠放，整体字号略缩，匹配设计稿。 */
+@media (max-width: 720px) {
+  .travel-welcome__intro {
+    font-size: 14px;
+    line-height: 1.65;
+  }
+
+  .travel-welcome__capabilities {
+    gap: var(--travel-space-xs);
+  }
+
+  .travel-welcome-capability__inner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 10px 12px;
+  }
+
+  .travel-welcome-capability__icon {
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+  }
+
+  .travel-welcome-capability__title {
+    font-size: 13px;
+  }
+
+  .travel-welcome-capability__subtitle {
+    font-size: 11px;
+  }
+
+  .travel-welcome__suggestion {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+}

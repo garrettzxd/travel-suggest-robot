@@ -69,3 +69,30 @@
   border-radius: 50%;
   background: currentColor;
 }
+
+/* 移动端 (≤720px)：标题居中、压缩高度并避让安全区，隐藏右侧在线徽章。 */
+@media (max-width: 720px) {
+  .travel-topbar {
+    height: var(--travel-layout-topbar-height-mobile);
+    padding-top: var(--travel-safe-top);
+  }
+
+  .travel-topbar__inner {
+    padding: 0 var(--travel-space-md);
+    justify-content: center;
+    text-align: center;
+  }
+
+  .travel-topbar__title {
+    font-size: 15px;
+  }
+
+  .travel-topbar__meta {
+    font-size: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .travel-topbar__status {
+    display: none;
+  }
+}

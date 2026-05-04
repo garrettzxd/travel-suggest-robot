@@ -189,3 +189,57 @@
 .travel-itinerary__footnote b {
   color: var(--card-ink);
 }
+
+/* 移动端 (≤720px)：行程卡内边距、时间轴节点与字号整体收一档，匹配设计稿。 */
+@media (max-width: 720px) {
+  .travel-itinerary {
+    padding: 14px 14px 16px;
+  }
+
+  .travel-itinerary__header {
+    padding-bottom: 10px;
+    margin-bottom: 12px;
+  }
+
+  .travel-itinerary__title {
+    font-size: 14px;
+  }
+
+  .travel-itinerary__meta {
+    font-size: 10px;
+  }
+
+  .travel-itinerary-day:not(:last-child) {
+    margin-bottom: 18px;
+  }
+
+  .travel-itinerary-day__subtitle {
+    font-size: 13px;
+  }
+
+  .travel-itinerary-item {
+    grid-template-columns: 14px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .travel-itinerary-item__node {
+    width: 14px;
+    height: 14px;
+  }
+
+  .travel-itinerary-timeline__rail {
+    left: 10px;
+  }
+
+  .travel-itinerary-item__title {
+    font-size: 13px;
+  }
+
+  .travel-itinerary-item__desc {
+    font-size: 12px;
+  }
+
+  .travel-itinerary__footnote {
+    font-size: 12px;
+  }
+}

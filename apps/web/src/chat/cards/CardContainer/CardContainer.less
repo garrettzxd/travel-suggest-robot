@@ -42,3 +42,10 @@
 .travel-card-container--tone-sand {
   background: var(--travel-tag-sand-bg);
 }
+
+/* 移动端 (≤720px)：将默认大尺寸内边距收紧，避免 24px 在窄屏过度占位。 */
+@media (max-width: 720px) {
+  .travel-card-container--pad-lg {
+    padding: var(--travel-space-md);
+  }
+}

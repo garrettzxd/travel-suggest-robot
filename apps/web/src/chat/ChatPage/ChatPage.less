@@ -1,9 +1,10 @@
 .travel-chat-page {
   height: 100vh;
-  width: 100vw;
+  width: 100%;
   display: flex;
   flex-direction: column;
   background: var(--travel-color-bg);
+  overflow-x: hidden;
 }
 
 .travel-chat-scroll {
@@ -74,5 +75,28 @@
     background: var(--travel-color-avoid-soft);
     color: var(--travel-color-avoid);
     border-radius: var(--travel-radius-card);
+  }
+}
+
+/* 移动端 (≤720px) 布局收口：内容内边距收紧、用户气泡放宽、头像缩小，并预留底部 InputBar 空间。 */
+@media (max-width: 720px) {
+  .travel-chat-content {
+    padding: var(--travel-space-md) var(--travel-space-md) 0;
+    gap: var(--travel-space-md);
+  }
+
+  .travel-chat-scroll {
+    padding-bottom: var(--travel-layout-input-pad-bottom-mobile);
+  }
+
+  .travel-user-bubble {
+    max-width: 85%;
+    font-size: 14px;
+  }
+
+  .travel-assistant-avatar {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
   }
 }

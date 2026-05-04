@@ -178,3 +178,45 @@
   color: var(--travel-color-ink-subtle);
   text-align: center;
 }
+
+/* 移动端 (≤720px)：当前天气、7 日预报与摘要均收一档字号 / 内边距，保持 7 列网格不换行。 */
+@media (max-width: 720px) {
+  .travel-weather-current__temp-value {
+    font-size: 28px;
+  }
+
+  .travel-weather-current__main {
+    gap: var(--travel-space-sm);
+  }
+
+  .travel-weather-icon--lg {
+    font-size: 36px;
+  }
+
+  .travel-weather-current__meta {
+    gap: var(--travel-space-sm);
+    flex-wrap: wrap;
+  }
+
+  .travel-weather-day {
+    padding: 6px 2px;
+  }
+
+  .travel-weather-day__weekday,
+  .travel-weather-day__temp {
+    font-size: 11.5px;
+  }
+
+  .travel-weather-day__date {
+    font-size: 10px;
+  }
+
+  .travel-weather-icon--sm {
+    font-size: 18px;
+  }
+
+  .travel-weather-summary {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+}

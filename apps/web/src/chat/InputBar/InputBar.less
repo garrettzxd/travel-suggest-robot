@@ -23,3 +23,15 @@
   color: var(--travel-color-ink-muted);
   letter-spacing: 0.06em;
 }
+
+/* 移动端 (≤720px)：内边距收紧并叠加底部安全区，避免遮挡 home indicator。 */
+@media (max-width: 720px) {
+  .travel-inputbar__inner {
+    padding: var(--travel-space-sm) var(--travel-space-md)
+      calc(var(--travel-space-md) + var(--travel-safe-bottom));
+  }
+
+  .travel-inputbar__hint {
+    font-size: 10px;
+  }
+}
