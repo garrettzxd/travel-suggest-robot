@@ -56,7 +56,10 @@ export function useTravelAgent() {
     setToolTrace([]);
     setIsRequesting(true);
 
-    const body: ChatRequest = { message, history: toHistory(baseMessages) };
+    // TODO(persistence-frontend): 后续 plan 接入 conversationId + 登录态后，
+    // history 不再由前端上传；当前 baseMessages 仅本地 UI 状态使用，不再随请求发送。
+    void baseMessages;
+    const body: ChatRequest = { message };
     const tokenBuffer = { current: '' };
     const ctx = { assistantMessageId, tokenBuffer, setMessages, setToolTrace };
 

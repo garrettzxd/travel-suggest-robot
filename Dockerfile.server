@@ -1,6 +1,8 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 RUN corepack enable
+# better-sqlite3 是 native 模块，alpine 默认无编译工具会装失败
+RUN apk add --no-cache python3 make g++
 
 COPY package.json pnpm-workspace.yaml tsconfig.base.json pnpm-lock.yaml .npmrc ./
 COPY packages/shared/package.json packages/shared/
@@ -19,6 +21,8 @@ FROM node:24-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 RUN corepack enable
+# runner 的 pnpm install --prod 会触发 better-sqlite3 重编译，同样需要 build deps
+RUN apk add --no-cache python3 make g++
 
 COPY package.json pnpm-workspace.yaml tsconfig.base.json pnpm-lock.yaml .npmrc ./
 COPY packages/shared/package.json packages/shared/
@@ -29,6 +33,8 @@ RUN pnpm install --frozen-lockfile --prod --filter @travel/server...
 
 COPY --from=builder /app/packages/shared/dist /app/packages/shared/dist
 COPY --from=builder /app/apps/server/dist /app/apps/server/dist
+# 启动时要跑 drizzle migrate，必须把 SQL migration 文件带进 runner
+COPY --from=builder /app/apps/server/drizzle /app/apps/server/drizzle
 
 WORKDIR /app/apps/server
 EXPOSE 3001

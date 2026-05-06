@@ -1,21 +1,22 @@
 // chat 路由的 Zod 校验 schema、跨模块共享类型、以及单轮请求的可变状态结构。
 // 拆分自原 routes/chat.types.ts + chat.ts 顶部的 LangChainStreamEvent 接口。
 import { z } from "zod";
-import type { Attraction, ToolName, TripCard, WeatherSnapshot } from "@travel/shared";
+import type {
+  Attraction,
+  Itinerary,
+  ToolName,
+  TripCard,
+  WeatherSnapshot,
+} from "@travel/shared";
 
-/** POST /api/chat 的请求体。history 允许缺省为空数组，避免首轮对话被挡。 */
+/**
+ * POST /api/chat 的请求体。
+ * - conversationId 不传 = 服务端自动新建对话；
+ * - history 字段已下线：服务端按 conversationId 从 messages 表读取（持久化方案落地后）。
+ */
 export const ChatRequestSchema = z.object({
   message: z.string().min(1),
-  history: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        role: z.enum(["user", "assistant"]),
-        content: z.string(),
-        createdAt: z.number(),
-      }),
-    )
-    .default([]),
+  conversationId: z.string().min(1).optional(),
 });
 
 // LangGraph 流式 message chunk 附带的元信息，langgraph_node 标识产出该 chunk 的节点。
@@ -91,6 +92,13 @@ export interface ChatStreamState {
   finalContent: string;
   skippedEmptyChunkCount: number;
   shouldShortCircuit: boolean;
+  // ====== 持久化用：handlers 把最终 emit 的结构化卡片回写这里，route.ts finally 一并落库 ======
+  // - completedTripCard：handleFinalizeTripCardEnd 最终合并出的 TripCard；
+  //   渐进式流（destination / weather / attractionsSummary 三件套全齐）走 finally 内部组装，
+  //   不在 handlers 里写这个字段。
+  cachedFinalTripCard: TripCard | undefined;
+  // - cachedItinerary：handleRecommendItineraryEnd 落到这里，给 finally 写库使用。
+  cachedItinerary: Itinerary | undefined;
 }
 
 /** 工厂方法：单轮请求开始时创建一个全新的可变状态。 */
@@ -115,5 +123,7 @@ export function createInitialState(): ChatStreamState {
     finalContent: "",
     skippedEmptyChunkCount: 0,
     shouldShortCircuit: false,
+    cachedFinalTripCard: undefined,
+    cachedItinerary: undefined,
   };
 }

@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+# git pull / merge 后自动跑 drizzle migrate（仅当 migration 目录有变动时）。
+# 避免「拉了代码忘了 migrate 导致启动报错」。
+# 注意：git pull --rebase 不会触发 post-merge，仅适用于 merge 流程。
+
+changed="$(git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD 2>/dev/null || true)"
+
+if echo "$changed" | grep -q "apps/server/drizzle/migrations/"; then
+  echo "[post-merge] detected drizzle migration changes, running pnpm db:migrate..."
+  pnpm -F @travel/server db:migrate
+fi
+
+# 防御：schema.ts 改了但作者忘了 generate migration
+if echo "$changed" | grep -q "apps/server/src/db/schema.ts"; then
+  echo "[post-merge] schema.ts changed; if no new migration appeared above, ask the author to run db:generate."
+fi

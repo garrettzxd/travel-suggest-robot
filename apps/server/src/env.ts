@@ -18,6 +18,13 @@ const EnvSchema = z.object({
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
+  // 持久化层 + 鉴权所需配置
+  DATABASE_URL: z.string().min(1).default("./data/dev.db"),
+  JWT_SECRET: z
+    .string()
+    .min(32, "JWT_SECRET 至少 32 字符；用 `openssl rand -base64 48` 生成"),
+  COOKIE_NAME: z.string().min(1).default("travel_auth"),
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

@@ -1,35 +1,34 @@
-// 把前端历史消息转换成 LangGraph agent 能消费的 messages 数组。
-import type { ChatMessage } from "@travel/shared";
+// 把对话历史转换成 LangGraph agent 能消费的 messages 数组。
+//
+// 设计说明（持久化版本）：
+// 当前轮的 user message 由 chat 路由在跑 agent 前**先写库**，因此本函数
+// 只需把 listMessagesByConversation 拿到的整段历史按时间顺序映射成
+// `{role, content}[]` 即可，不需要再额外追加当前轮的 user 输入。
+import type { MessageRow } from "../../db/schema.js";
+
+/** 旧 assistant 空内容（仅卡片）的占位摘要——避免 Moonshot 收到空 content 报错。 */
+const EMPTY_ASSISTANT_PLACEHOLDER =
+  "[此前一回合已生成结构化旅行卡片或完成处理，请勿为该地名重复调用工具。]";
 
 /**
- * 把前端历史消息拼成 LangGraph 能消费的 `{role, content}[]`，末尾附上本轮 user 输入。
+ * 从 DB 加载的历史消息（已按 createdAt 正序）转为 LangGraph 输入。
  *
- * 处理两类边界情况：
- * - 空 assistant content：前端有时会把"已完成的结构化卡片回合"合成 "[已为「xxx」生成...]"
- *   这种摘要发回来；但万一没合成（旧客户端 / 异常路径）就只剩 ""。直接发给 Moonshot
- *   会报 "unknown content type:"，且模型也会以为上一轮没完成而重复调工具。
- *   这里统一兜底成 "[此前一回合已完成，请勿重复调用相同工具]" 的占位。
- * - user 空 content：当作真正的空消息丢掉（不会出现，但保留过滤防御）。
+ * 边界处理：
+ * - assistant content === ""（仅卡片回合）：替换为占位摘要，避免空 content 触发模型异常；
+ * - user content === ""：理论上 schema 拒绝了 NOT NULL；保留 filter 作为防御。
  */
-export function historyToAgentMessages(history: ChatMessage[], message: string) {
-  return [
-    ...history
-      .filter((item) => {
-        if (typeof item.content !== "string") return false;
-        // user 端真正空消息丢掉；assistant 端空 content 会被下面替换成占位摘要，不丢。
-        if (item.role === "user" && item.content.trim() === "") return false;
-        return true;
-      })
-      .map((item) => ({
-        role: item.role,
-        content:
-          item.role === "assistant" && item.content.trim() === ""
-            ? "[此前一回合已生成结构化旅行卡片或完成处理，请勿为该地名重复调用工具。]"
-            : item.content,
-      })),
-    {
-      role: "user" as const,
-      content: message,
-    },
-  ];
+export function dbMessagesToAgentMessages(rows: MessageRow[]) {
+  return rows
+    .filter((row) => {
+      if (typeof row.content !== "string") return false;
+      if (row.role === "user" && row.content.trim() === "") return false;
+      return true;
+    })
+    .map((row) => ({
+      role: row.role,
+      content:
+        row.role === "assistant" && row.content.trim() === ""
+          ? EMPTY_ASSISTANT_PLACEHOLDER
+          : row.content,
+    }));
 }

@@ -9,8 +9,16 @@ services:
       PORT: 3001
       CORS_ORIGIN: http://localhost:8080
       QWEATHER_PRIVATE_KEY_PATH: /app/secrets/qweather-ed25519-private.pem
+      # 持久化 + 鉴权：DATABASE_URL 用绝对路径锁定到挂载点，避免 cwd 漂移
+      DATABASE_URL: /app/apps/server/data/prod.db
+      JWT_SECRET: ${JWT_SECRET}
+      COOKIE_NAME: travel_auth
+      NODE_ENV: production
     volumes:
       - ./secrets:/app/secrets:ro
+      # SQLite 数据卷：宿主机 ./data 与容器内 /app/apps/server/data 双向挂载
+      # 上线前先 mkdir -p data && chmod 755 data，否则容器写不进去
+      - ./data:/app/apps/server/data
     ports:
       - "3001:3001"
 

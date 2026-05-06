@@ -170,6 +170,7 @@ function handleRecommendItineraryEnd(
 
   const itinerary: Itinerary = itineraryResult;
   state.itineraryEmitted = true;
+  state.cachedItinerary = itinerary;
   log.toolResult(toolLabel("recommendItinerary"), {
     toolCallId: event.run_id,
     toolName: "recommendItinerary",
@@ -436,6 +437,7 @@ function handleFinalizeTripCardEnd(
 
   const card = buildTripCard(finalize, state.cachedWeather, state.cachedAttractions);
   state.cardEmitted = true;
+  state.cachedFinalTripCard = card;
   log.toolResult(toolLabel("finalizeTripCard"), {
     toolCallId: event.run_id,
     toolName: "finalizeTripCard",

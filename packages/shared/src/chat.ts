@@ -15,10 +15,14 @@ export interface ChatMessage {
   createdAt: number;
 }
 
-/** POST /api/chat 请求体 */
+/**
+ * POST /api/chat 请求体。
+ * - conversationId 不传 = 服务端自动新建对话；
+ * - history 不再由前端上传，服务端按 conversationId 从 messages 表读取。
+ */
 export interface ChatRequest {
   message: string;
-  history: ChatMessage[];
+  conversationId?: string;
 }
 
 /**
@@ -49,10 +53,12 @@ export type ToolName =
  * - transport：由 recommendTransport 产出的 TransportPlan，前端渲染交通规划卡（预留）；
  * - food：由 recommendFood 产出的 FoodRecommendation，前端渲染美食建议卡（预留）；
  * - final：LLM 最终文本（通常在开启 TripCard 流程时为空）；
+ * - conversation：流首帧下发的 conversationId 与 isNew 标志，前端据此把 id 写进 URL；
  * - error / done：终态。
  */
 export type StreamEvent =
   | { type: 'token'; delta: string }
+  | { type: 'conversation'; conversationId: string; isNew: boolean }
   | { type: 'tool_start'; name: ToolName; args: unknown }
   | { type: 'tool_end'; name: ToolName; result: unknown }
   | { type: 'card'; card: TripCard }
