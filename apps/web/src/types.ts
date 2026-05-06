@@ -10,4 +10,10 @@ export type {
   TripCard,
   ProgressiveTripCard,
   Itinerary,
+  ItineraryDay,
+  ItineraryItem,
+  TransportPlan,
+  TransportSegment,
+  FoodRecommendation,
+  FoodItem,
 } from '@travel/shared';

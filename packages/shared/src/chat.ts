@@ -1,4 +1,11 @@
-import type { Attraction, Itinerary, TripCard, WeatherSnapshot } from './travel.js';
+import type {
+  Attraction,
+  FoodRecommendation,
+  Itinerary,
+  TransportPlan,
+  TripCard,
+  WeatherSnapshot,
+} from './travel.js';
 
 /** 单条聊天消息 */
 export interface ChatMessage {
@@ -28,7 +35,9 @@ export type ToolName =
   | 'finalizeTripDestination'
   | 'finalizeTripWeather'
   | 'finalizeTripAttractionsSummary'
-  | 'recommendItinerary';
+  | 'recommendItinerary'
+  | 'recommendTransport'
+  | 'recommendFood';
 
 /**
  * SSE 下行事件。
@@ -37,6 +46,8 @@ export type ToolName =
  * - card：由 finalizeTripCard 合并出的完整 TripCard，保留作兼容事件；
  * - card_destination / card_weather / card_attractions_summary：TripCard 渐进式局部事件；
  * - itinerary：由 recommendItinerary 产出的完整 Itinerary，前端据此渲染行程规划卡；
+ * - transport：由 recommendTransport 产出的 TransportPlan，前端渲染交通规划卡（预留）；
+ * - food：由 recommendFood 产出的 FoodRecommendation，前端渲染美食建议卡（预留）；
  * - final：LLM 最终文本（通常在开启 TripCard 流程时为空）；
  * - error / done：终态。
  */
@@ -54,6 +65,8 @@ export type StreamEvent =
       chips: string[];
     }
   | { type: 'itinerary'; itinerary: Itinerary }
+  | { type: 'transport'; transport: TransportPlan }
+  | { type: 'food'; food: FoodRecommendation }
   | { type: 'final'; content: string }
   | { type: 'error'; message: string }
   | { type: 'done' };

@@ -177,3 +177,76 @@ export interface Itinerary {
   /** 底部"提示"虚线区文案；可空 */
   footnote?: string;
 }
+
+/**
+ * 单段交通方案。
+ * 一条 from→to 的具体出行选项，多段可串联多日行程。
+ */
+export interface TransportSegment {
+  /** 出发地（城市或站点） */
+  from: string;
+  /** 到达地（城市或站点） */
+  to: string;
+  /** 交通方式：飞机 / 高铁 / 动车 / 长途汽车 / 自驾 / 轮渡 等 */
+  mode: string;
+  /** 出发时间或时段，如 "08:30" / "上午" */
+  departTime?: string;
+  /** 到达时间或时段 */
+  arriveTime?: string;
+  /** 时长描述，如 "约 2h30m" */
+  duration?: string;
+  /** 价格区间文案，如 "¥320–¥580"；缺失置 undefined */
+  priceRange?: string;
+  /** 一句话推荐说明 / 注意事项 */
+  note?: string;
+}
+
+/**
+ * 一张完整的「交通规划卡」。
+ * 由 recommendTransport 工具产出并通过 SSE `transport` 事件下发，
+ * 与 TripCard / Itinerary 平级渲染。
+ */
+export interface TransportPlan {
+  /** 卡片标题，如 "5/1 北京 → 杭州 · 推荐方案" */
+  title: string;
+  /** 起讫概要，如 "北京 → 杭州（建议高铁）" */
+  summary: string;
+  /** 推荐交通段集合，建议 2–5 条 */
+  segments: TransportSegment[];
+  /** 底部"提示"区文案；可空 */
+  footnote?: string;
+}
+
+/**
+ * 单条美食 / 餐厅条目。
+ */
+export interface FoodItem {
+  /** 菜名或餐厅名 */
+  name: string;
+  /** 类型：地方菜 / 小吃 / 伴手礼 / 甜品 等 */
+  category: string;
+  /** 推荐场景：早餐 / 午餐 / 夜宵 / 伴手礼；可空 */
+  scene?: string;
+  /** 价格区间文案，如 "人均 ¥80"；可空 */
+  priceRange?: string;
+  /** 一句话推荐理由 */
+  description?: string;
+  /** 推荐店铺 / 地点；可空 */
+  venue?: string;
+}
+
+/**
+ * 一张完整的「美食建议卡」。
+ * 由 recommendFood 工具产出并通过 SSE `food` 事件下发，
+ * 与 TripCard / Itinerary / TransportPlan 平级渲染。
+ */
+export interface FoodRecommendation {
+  /** 卡片标题，如 "杭州必吃 · 8 选" */
+  title: string;
+  /** 城市 / 区域名 */
+  region: string;
+  /** 美食条目，建议 4–10 条 */
+  items: FoodItem[];
+  /** 底部备注文案；可空 */
+  footnote?: string;
+}
