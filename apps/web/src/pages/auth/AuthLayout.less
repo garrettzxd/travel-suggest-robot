@@ -1,0 +1,242 @@
+.auth-layout {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: var(--travel-font-sans);
+}
+
+// ── 左侧黑色面板 ────────────────────────────────────────────────────
+.auth-left {
+  flex: 0 0 44%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 36px 40px 32px;
+  background-color: #0f0f0f;
+  background-image: repeating-linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.032) 0,
+    rgba(255, 255, 255, 0.032) 1px,
+    transparent 1px,
+    transparent 18px
+  );
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+
+  // 中央光晕装饰
+  &::before {
+    content: '';
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 340px;
+    height: 340px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.07) 0%, transparent 70%);
+    pointer-events: none;
+  }
+}
+
+.auth-left-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1;
+
+  .logo-icon {
+    width: 48px;
+    height: 48px;
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    svg {
+      width: 24px;
+      height: 24px;
+      color: #fff;
+    }
+  }
+
+  .logo-text {
+    display: flex;
+    flex-direction: column;
+
+    .logo-name {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      color: #fff;
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      font-weight: 400;
+      letter-spacing: 0.18em;
+      color: rgba(255, 255, 255, 0.45);
+      text-transform: uppercase;
+    }
+  }
+}
+
+.auth-left-body {
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 32px;
+}
+
+.auth-left-label {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+}
+
+.auth-left-heading {
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.22;
+  color: #fff;
+  margin-bottom: 16px;
+  letter-spacing: -0.01em;
+}
+
+.auth-left-desc {
+  font-size: 14px;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 32px;
+}
+
+.auth-left-cards {
+  display: flex;
+  gap: 10px;
+}
+
+.auth-left-card {
+  padding: 12px 14px;
+  border-radius: 12px;
+  min-width: 88px;
+
+  .card-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.75);
+    margin-bottom: 2px;
+  }
+
+  .card-sub {
+    font-size: 11px;
+    color: rgba(0, 0, 0, 0.5);
+  }
+}
+
+.auth-left-footer {
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.28);
+  letter-spacing: 0.06em;
+}
+
+// ── 右侧白色面板 ────────────────────────────────────────────────────
+.auth-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  overflow-y: auto;
+}
+
+.auth-right-nav {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 48px;
+  height: 60px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+
+  .nav-brand {
+    justify-self: start;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    color: #6b6b6b;
+    text-transform: uppercase;
+  }
+
+  .nav-actions {
+    justify-self: center;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .nav-btn {
+      height: 34px;
+      padding: 0 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: all 0.15s;
+
+      &.active {
+        background: #0f0f0f;
+        color: #fff;
+
+        &:hover {
+          background: #2a2a2a;
+        }
+      }
+
+      &.ghost {
+        background: transparent;
+        color: #1a1a1a;
+
+        &:hover {
+          background: #f5f5f5;
+        }
+      }
+    }
+  }
+}
+
+.auth-right-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 48px;
+  max-width: 560px;
+  width: 100%;
+  align-self: center;
+}
+
+.auth-right-footer {
+  padding: 16px 48px;
+  font-size: 12px;
+  color: #b0b0b0;
+  display: flex;
+  gap: 20px;
+  flex-shrink: 0;
+
+  a {
+    color: #9a9a9a;
+    text-decoration: none;
+
+    &:hover {
+      color: #1a1a1a;
+    }
+  }
+}

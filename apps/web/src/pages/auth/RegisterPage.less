@@ -1,0 +1,158 @@
+.register-page {
+  width: 100%;
+}
+
+.register-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+
+  .step-label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    color: #b0b0b0;
+    text-transform: uppercase;
+  }
+
+  .step-progress {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: #c8c8c8;
+  }
+}
+
+.register-heading {
+  font-size: 30px;
+  font-weight: 700;
+  color: #0f0f0f;
+  line-height: 1.22;
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+}
+
+.register-sub {
+  font-size: 14px;
+  color: #6b6b6b;
+  margin-bottom: 28px;
+  line-height: 1.5;
+}
+
+.register-form {
+  .form-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #4a4a4a;
+    margin-bottom: 6px;
+  }
+
+  :global(.ant-form-item) {
+    margin-bottom: 16px;
+  }
+
+  :global(.ant-input-affix-wrapper) {
+    height: 48px;
+    border-radius: 10px;
+    border-color: #e8e8e8;
+    font-size: 14px;
+    padding: 0 14px;
+    background: #fafafa;
+
+    &:hover,
+    &:focus-within {
+      border-color: #0f0f0f;
+      background: #fff;
+    }
+  }
+
+  :global(.ant-input) {
+    background: transparent;
+    font-size: 14px;
+  }
+
+  :global(.ant-input-prefix) {
+    color: #bbb;
+    margin-right: 10px;
+  }
+}
+
+// 密码强度指示条
+.password-strength {
+  margin-top: -8px;
+  margin-bottom: 16px;
+
+  .strength-bars {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 4px;
+
+    .bar {
+      flex: 1;
+      height: 3px;
+      border-radius: 2px;
+      background: #ebebeb;
+      transition: background 0.25s;
+
+      &.filled-0 { background: #ff4d4f; }  // 弱：红
+      &.filled-1 { background: #fa8c16; }  // 一般：橙
+      &.filled-2 { background: #52c41a; }  // 强：绿
+      &.filled-3 { background: #52c41a; }  // 很强：绿
+    }
+  }
+
+  .strength-label {
+    font-size: 12px;
+    color: #9a9a9a;
+
+    &.s0 { color: #ff4d4f; }
+    &.s1 { color: #fa8c16; }
+    &.s2 { color: #52c41a; }
+    &.s3 { color: #52c41a; }
+  }
+}
+
+.register-terms {
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: #4a4a4a;
+
+  :global(.ant-checkbox-wrapper) {
+    align-items: flex-start;
+  }
+
+  a {
+    color: #0f0f0f;
+    font-weight: 500;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.register-submit-btn {
+  width: 100%;
+  height: 48px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  background: #0f0f0f;
+  border-color: #0f0f0f;
+  letter-spacing: 0.02em;
+
+  &:hover,
+  &:focus {
+    background: #2a2a2a !important;
+    border-color: #2a2a2a !important;
+  }
+
+  &:disabled,
+  &[disabled] {
+    background: #d0d0d0 !important;
+    border-color: #d0d0d0 !important;
+    color: #fff !important;
+    cursor: not-allowed;
+  }
+}

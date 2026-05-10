@@ -89,7 +89,8 @@
       "Bash(curl -is -N -X POST http://localhost:3001/api/chat -H 'Content-Type: application/json' -H 'Accept: text/event-stream' -b /tmp/cookie-alice.txt --max-time 60 -d '{\"message\":\"明天去北京天气怎么样\"}')",
       "Bash(curl -s http://localhost:3001/api/conversations/uTgIyLXkdvTYDBZ9jrSsM -b /tmp/cookie-alice.txt)",
       "Bash(curl -s http://localhost:3001/api/conversations -b /tmp/cookie-alice.txt)",
-      "Bash(curl -s -N -X POST http://localhost:3001/api/chat -H 'Content-Type: application/json' -H 'Accept: text/event-stream' -b /tmp/cookie-alice.txt --max-time 120 -d '{\"message\":\"那帮我安排个三日行程\",\"conversationId\":\"uTgIyLXkdvTYDBZ9jrSsM\"}')"
+      "Bash(curl -s -N -X POST http://localhost:3001/api/chat -H 'Content-Type: application/json' -H 'Accept: text/event-stream' -b /tmp/cookie-alice.txt --max-time 120 -d '{\"message\":\"那帮我安排个三日行程\",\"conversationId\":\"uTgIyLXkdvTYDBZ9jrSsM\"}')",
+      "Bash(pnpm -F @travel/web add react-router-dom)"
     ]
   }
 }

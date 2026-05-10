@@ -12,6 +12,7 @@ export async function postChat(
       Accept: 'text/event-stream',
     },
     body: JSON.stringify(body),
+    credentials: 'include',
     signal,
   });
 
