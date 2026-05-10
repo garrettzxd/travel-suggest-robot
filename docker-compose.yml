@@ -13,7 +13,7 @@ services:
       DATABASE_URL: /app/apps/server/data/prod.db
       JWT_SECRET: ${JWT_SECRET}
       COOKIE_NAME: travel_auth
-      NODE_ENV: production
+      NODE_ENV: development
     volumes:
       - ./secrets:/app/secrets:ro
       # SQLite 数据卷：宿主机 ./data 与容器内 /app/apps/server/data 双向挂载
