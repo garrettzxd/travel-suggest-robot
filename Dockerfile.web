@@ -7,7 +7,8 @@ COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile --filter @travel/web... --ignore-scripts \
+ && pnpm rebuild --pending --filter @travel/web...
 
 COPY packages/shared packages/shared
 COPY apps/web apps/web

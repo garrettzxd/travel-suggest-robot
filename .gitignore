@@ -13,3 +13,6 @@ secrets/
 apps/server/data/*.db
 apps/server/data/*.db-shm
 apps/server/data/*.db-wal
+data/*.db
+data/*.db-shm
+data/*.db-wal

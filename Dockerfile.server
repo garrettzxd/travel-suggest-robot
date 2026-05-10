@@ -29,7 +29,8 @@ COPY packages/shared/package.json packages/shared/
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 
-RUN pnpm install --frozen-lockfile --prod --filter @travel/server...
+RUN pnpm install --frozen-lockfile --prod --filter @travel/server... --ignore-scripts \
+ && pnpm rebuild --pending --filter @travel/server...
 
 COPY --from=builder /app/packages/shared/dist /app/packages/shared/dist
 COPY --from=builder /app/apps/server/dist /app/apps/server/dist
