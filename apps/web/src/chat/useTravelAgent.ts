@@ -1,10 +1,9 @@
-import { useRef, useState } from 'react';
-import type { ChatRequest } from '@travel/shared';
+import { useCallback, useRef, useState } from 'react';
+import type { ChatMessageWithCards, ChatRequest } from '@travel/shared';
 import { postChat } from '../api/client';
 import type { ToolTraceEntry, TravelChatMessage } from './types';
 import { readSseFrames } from './sse/parser';
 import { sseEventHandlers } from './sse/eventHandlers';
-import { toHistory } from './message/history';
 import { patchAssistantMessage } from './message/patch';
 import { markRunningToolsAsError } from './tool/trace';
 
@@ -20,11 +19,65 @@ export type { TravelChatMessage, ToolTraceEntry } from './types';
  * 业务细节（事件→状态映射、历史摘要、卡片合成）已拆到独立模块，新增卡片时主循环不动。
  * 详见 apps/web/src/chat/ARCHITECTURE.md。
  */
-export function useTravelAgent() {
+export interface ConversationSsePayload {
+  conversationId: string;
+  isNew: boolean;
+}
+
+export interface UseTravelAgentOptions {
+  onConversationResolved?: (payload: ConversationSsePayload) => void;
+  onRequestSettled?: (conversationId: string | null) => void;
+}
+
+function toTravelMessage(message: ChatMessageWithCards): TravelChatMessage {
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt,
+    status: message.role === 'user' ? 'local' : 'success',
+    ...(message.card ? { card: message.card } : {}),
+    ...(message.itinerary ? { itinerary: message.itinerary } : {}),
+    ...(message.transport ? { transport: message.transport } : {}),
+    ...(message.food ? { food: message.food } : {}),
+  };
+}
+
+export function useTravelAgent(options: UseTravelAgentOptions = {}) {
   const [messages, setMessages] = useState<TravelChatMessage[]>([]);
   const [toolTrace, setToolTrace] = useState<ToolTraceEntry[]>([]);
   const [isRequesting, setIsRequesting] = useState(false);
+  const [conversationId, setConversationIdState] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const conversationIdRef = useRef<string | null>(null);
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
+  const setConversationId = useCallback((next: string | null) => {
+    conversationIdRef.current = next;
+    setConversationIdState(next);
+  }, []);
+
+  const resetConversation = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setConversationId(null);
+    setMessages([]);
+    setToolTrace([]);
+    setIsRequesting(false);
+  }, [setConversationId]);
+
+  const loadConversation = useCallback(
+    (id: string, historyMessages: ChatMessageWithCards[]) => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      setConversationId(id);
+      setMessages(historyMessages.map(toTravelMessage));
+      setToolTrace([]);
+      setIsRequesting(false);
+    },
+    [setConversationId],
+  );
 
   /**
    * 发送用户输入并把服务端 SSE 事件增量合并到当前 assistant 消息。
@@ -44,30 +97,54 @@ export function useTravelAgent() {
       id: `user-${Date.now()}`,
       role: 'user',
       content: message,
+      createdAt: Date.now(),
       status: 'local',
     };
     const assistantMessageId = `assistant-${Date.now()}`;
+    const assistantCreatedAt = Date.now();
 
     setMessages((prev) => [
       ...prev,
       userMessage,
-      { id: assistantMessageId, role: 'assistant', content: '', status: 'loading' },
+      {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: '',
+        createdAt: assistantCreatedAt,
+        status: 'loading',
+      },
     ]);
     setToolTrace([]);
     setIsRequesting(true);
 
-    // TODO(persistence-frontend): 后续 plan 接入 conversationId + 登录态后，
-    // history 不再由前端上传；当前 baseMessages 仅本地 UI 状态使用，不再随请求发送。
+    // 当前历史由服务端按 conversationId 从 DB 加载；baseMessages 仅保留给本地乐观 UI。
     void baseMessages;
-    const body: ChatRequest = { message };
+    const activeConversationId = conversationIdRef.current;
+    const body: ChatRequest = {
+      message,
+      ...(activeConversationId ? { conversationId: activeConversationId } : {}),
+    };
     const tokenBuffer = { current: '' };
     const ctx = { assistantMessageId, tokenBuffer, setMessages, setToolTrace };
+    let resolvedConversationId = activeConversationId;
 
     try {
       const stream = await postChat(body, controller.signal);
 
       for await (const { event, data } of readSseFrames(stream)) {
         if (event === 'done') break;
+        if (event === 'conversation') {
+          const payload = data as Partial<ConversationSsePayload>;
+          if (payload.conversationId) {
+            resolvedConversationId = payload.conversationId;
+            setConversationId(payload.conversationId);
+            optionsRef.current.onConversationResolved?.({
+              conversationId: payload.conversationId,
+              isNew: !!payload.isNew,
+            });
+          }
+          continue;
+        }
         const handler = sseEventHandlers[event];
         if (!handler) continue; // 未注册事件静默忽略，保持向后兼容。
         const result = handler(data, ctx);
@@ -89,8 +166,17 @@ export function useTravelAgent() {
         abortRef.current = null;
         setIsRequesting(false);
       }
+      optionsRef.current.onRequestSettled?.(resolvedConversationId);
     }
   }
 
-  return { messages, onRequest, toolTrace, isRequesting };
+  return {
+    messages,
+    onRequest,
+    toolTrace,
+    isRequesting,
+    conversationId,
+    loadConversation,
+    resetConversation,
+  };
 }

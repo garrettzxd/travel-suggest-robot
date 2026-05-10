@@ -3,6 +3,9 @@ import { Bubble } from '@ant-design/x';
 import type { BubbleProps } from '@ant-design/x';
 import XMarkdown from '@ant-design/x-markdown';
 import { Typography } from 'antd';
+import type { AuthUser, ConversationListItem } from '@travel/shared';
+import { getConversation, listConversations } from '../../api/client';
+import { useAuth } from '../../auth/useAuth';
 import { TopBar } from '../TopBar';
 import { InputBar } from '../InputBar';
 import { WelcomeCard } from '../cards/WelcomeCard';
@@ -13,6 +16,59 @@ import './ChatPage.less';
 
 const TYPING_STEP = 2;
 const TYPING_INTERVAL = 30;
+
+function CompassIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M15.5 8.5l-2 5-5 2 2-5 5-2z" fill="currentColor" fillOpacity="0.15" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="16"
+      height="16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function ClockIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="10"
+      height="10"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </svg>
+  );
+}
 
 /** MarkdownTyping：作为"无结构化数据"场景的兜底，按字符逐步展示。 */
 function MarkdownTyping({ content }: { content: string }) {
@@ -60,9 +116,13 @@ function AssistantHeader({ time }: { time: string }) {
 }
 
 /** 把消息 id 中的时间戳还原为 Date，用作 assistant header 的小时分钟显示。 */
-function deriveMessageTime(id: string): string {
+function deriveMessageTime(id: string, createdAt?: number): string {
   const ts = Number(id.split('-')[1]);
-  const date = Number.isFinite(ts) ? new Date(ts) : new Date();
+  const date = typeof createdAt === 'number' && Number.isFinite(createdAt)
+    ? new Date(createdAt)
+    : Number.isFinite(ts)
+      ? new Date(ts)
+      : new Date();
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 }
 
@@ -74,15 +134,79 @@ function deriveTitle(messages: TravelChatMessage[]): string {
   return head.length < firstUser.content.length ? `${head}…` : head;
 }
 
+function formatRelativeTime(value: number): string {
+  const diff = Date.now() - value;
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (diff < minute) return '刚刚';
+  if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`;
+  if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
+  if (diff < day * 7) return `${Math.floor(diff / day)} 天前`;
+  return new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(value);
+}
+
+function getUserInitial(user?: AuthUser | null): string {
+  const source = user?.username || user?.email || 'Z';
+  return source.trim().slice(0, 1).toUpperCase();
+}
+
 /**
  * ChatPage 路由层：根据 assistant 消息上是否带结构化卡片数据决定渲染
  * TripCardView / ItineraryCard 还是 MarkdownTyping。空会话顶部展示 WelcomeCard。
  */
 export default function ChatPage() {
-  const { messages, onRequest, isRequesting } = useTravelAgent();
+  const { user } = useAuth();
+  const [conversations, setConversations] = useState<ConversationListItem[]>([]);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
+  const [conversationLoading, setConversationLoading] = useState(false);
+  const [activeConversation, setActiveConversation] = useState<ConversationListItem | null>(null);
+  const refreshConversationsRef = useRef<() => Promise<void>>(async () => undefined);
+  const {
+    messages,
+    onRequest,
+    isRequesting,
+    conversationId,
+    loadConversation,
+    resetConversation,
+  } = useTravelAgent({
+    onConversationResolved: ({ conversationId: nextId }) => {
+      setActiveConversation((prev) =>
+        prev?.id === nextId
+          ? prev
+          : conversations.find((item) => item.id === nextId) ?? prev,
+      );
+    },
+    onRequestSettled: () => {
+      void refreshConversationsRef.current();
+    },
+  });
   const [inputValue, setInputValue] = useState('');
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const shouldStickToBottomRef = useRef(true);
+
+  useEffect(() => {
+    refreshConversationsRef.current = async () => {
+      if (!user) return;
+      setConversationsLoading(true);
+      try {
+        const { items } = await listConversations();
+        setConversations(items);
+        setActiveConversation((prev) => {
+          if (conversationId) return items.find((item) => item.id === conversationId) ?? prev;
+          if (!prev) return null;
+          return items.find((item) => item.id === prev.id) ?? prev;
+        });
+      } finally {
+        setConversationsLoading(false);
+      }
+    };
+  }, [conversationId, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    void refreshConversationsRef.current();
+  }, [user]);
 
   // 只有用户本来就在底部附近时才自动跟随流式更新；用户上滑查看卡片时保持当前位置。
   useEffect(() => {
@@ -93,10 +217,16 @@ export default function ChatPage() {
 
   const lastUpdatedAt = useMemo(() => {
     const last = messages[messages.length - 1];
-    if (!last) return new Date();
+    if (!last) return activeConversation ? new Date(activeConversation.updatedAt) : new Date();
+    if (last.createdAt) return new Date(last.createdAt);
     const ts = Number(last.id.split('-')[1]);
     return Number.isFinite(ts) ? new Date(ts) : new Date();
-  }, [messages]);
+  }, [activeConversation, messages]);
+
+  const title = useMemo(() => {
+    if (messages.length > 0) return deriveTitle(messages);
+    return activeConversation?.title || '漫游 · 旅行建议';
+  }, [activeConversation, messages]);
 
   /** 提交后立刻清空输入框，请求生命周期交给 useTravelAgent 管理。 */
   const handleSubmit = (value: string) => {
@@ -107,6 +237,29 @@ export default function ChatPage() {
     onRequest(text);
   };
 
+  const handleSelectConversation = async (conversation: ConversationListItem) => {
+    if (conversation.id === conversationId && !conversationLoading) return;
+    setConversationLoading(true);
+    shouldStickToBottomRef.current = true;
+    try {
+      const detail = await getConversation(conversation.id);
+      setActiveConversation({
+        ...detail.conversation,
+        lastMessagePreview: conversation.lastMessagePreview,
+      });
+      loadConversation(detail.conversation.id, detail.messages);
+    } finally {
+      setConversationLoading(false);
+    }
+  };
+
+  const handleNewConversation = () => {
+    setActiveConversation(null);
+    setInputValue('');
+    shouldStickToBottomRef.current = true;
+    resetConversation();
+  };
+
   /** 记录用户是否仍贴近底部，用于决定后续流式数据是否需要自动滚动。 */
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -115,37 +268,91 @@ export default function ChatPage() {
     shouldStickToBottomRef.current = distanceToBottom < 96;
   };
 
-  return (
-    <div className="travel-chat-page">
-      <TopBar
-        title={deriveTitle(messages)}
-        messageCount={messages.length}
-        updatedAt={lastUpdatedAt}
-        online
-      />
+  if (!user) {
+    return <div className="travel-chat-loading">正在载入漫游…</div>;
+  }
 
-      <div ref={scrollRef} onScroll={handleScroll} className="travel-chat-scroll">
-        <div className="travel-chat-content">
-          {messages.length === 0 ? (
-            <WelcomeCard onSuggestionClick={handleSubmit} />
+  return (
+    <div className="travel-chat-shell">
+      <aside className="travel-history-sidebar">
+        <div className="travel-sidebar-brand">
+          <div className="travel-sidebar-logo">
+            <CompassIcon />
+          </div>
+          <div>
+            <div className="travel-sidebar-title">漫游</div>
+            <div className="travel-sidebar-subtitle">TRAVEL · AI</div>
+          </div>
+        </div>
+
+        <button className="travel-new-thread" type="button" onClick={handleNewConversation}>
+          <PlusIcon />
+          开启新旅程
+        </button>
+
+        <div className="travel-thread-section-label">近期对话</div>
+        <div className="travel-thread-list">
+          {conversationsLoading && conversations.length === 0 ? (
+            <div className="travel-thread-empty">正在同步历史记录…</div>
+          ) : conversations.length === 0 ? (
+            <div className="travel-thread-empty">还没有历史对话</div>
           ) : (
-            messages.map((message) => (
-              <MessageRow
-                key={message.id}
-                message={message}
-                onChipClick={handleSubmit}
-              />
+            conversations.map((conversation) => (
+              <button
+                key={conversation.id}
+                className={`travel-thread-item ${
+                  conversation.id === conversationId ? 'is-active' : ''
+                }`}
+                type="button"
+                onClick={() => void handleSelectConversation(conversation)}
+              >
+                <span className="travel-thread-title">{conversation.title}</span>
+                <span className="travel-thread-meta">
+                  <ClockIcon />
+                  {formatRelativeTime(conversation.updatedAt)}
+                </span>
+              </button>
             ))
           )}
         </div>
-      </div>
 
-      <InputBar
-        value={inputValue}
-        onChange={setInputValue}
-        onSubmit={handleSubmit}
-        loading={isRequesting}
-      />
+        <div className="travel-sidebar-user">
+          <div className="travel-sidebar-avatar">{getUserInitial(user)}</div>
+          <div className="travel-sidebar-user-main">
+            <div className="travel-sidebar-username">{user.username}</div>
+            <div className="travel-sidebar-email">已保存 {conversations.length} 段行程</div>
+          </div>
+        </div>
+      </aside>
+
+      <main className="travel-chat-page">
+        <TopBar title={title} messageCount={messages.length} updatedAt={lastUpdatedAt} online />
+
+        <div ref={scrollRef} onScroll={handleScroll} className="travel-chat-scroll">
+          <div className="travel-chat-content">
+            {conversationLoading ? (
+              <div className="travel-chat-state">正在打开历史对话…</div>
+            ) : messages.length === 0 ? (
+              <WelcomeCard onSuggestionClick={handleSubmit} />
+            ) : (
+              messages.map((message) => (
+                <MessageRow
+                  key={message.id}
+                  message={message}
+                  onChipClick={handleSubmit}
+                />
+              ))
+            )}
+          </div>
+        </div>
+
+        <InputBar
+          value={inputValue}
+          onChange={setInputValue}
+          onSubmit={handleSubmit}
+          loading={isRequesting}
+        />
+      </main>
     </div>
   );
 }
@@ -164,7 +371,7 @@ function MessageRow({
     return <UserBubble content={message.content} />;
   }
 
-  const time = deriveMessageTime(message.id);
+  const time = deriveMessageTime(message.id, message.createdAt);
   const hasTripCardData = !!(
     message.weather ||
     message.attractions ||

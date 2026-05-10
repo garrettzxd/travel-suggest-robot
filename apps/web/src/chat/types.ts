@@ -37,6 +37,7 @@ export interface TravelChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  createdAt?: number;
   status?: 'local' | 'loading' | 'updating' | 'success' | 'error' | 'abort';
   weather?: WeatherSnapshot;
   attractions?: Attraction[];
