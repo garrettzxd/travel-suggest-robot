@@ -53,6 +53,18 @@ export default function LoginPage() {
   return (
     <AuthLayout variant="login">
       <div className="login-page">
+        <div className="login-mobile-brand">
+          <div className="mobile-brand-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M15.5 8.5l-2 5-5 2 2-5 5-2z" fill="currentColor" fillOpacity="0.15" />
+            </svg>
+          </div>
+          <div>
+            <div className="mobile-brand-name">漫游</div>
+            <div className="mobile-brand-sub">TRAVEL · AI</div>
+          </div>
+        </div>
         <div className="login-step-label">SIGN IN · 01</div>
         <h1 className="login-heading">欢迎回来，继续旅程。</h1>
         <p className="login-sub">使用账号登录漫游。</p>
@@ -124,6 +136,8 @@ export default function LoginPage() {
             立即注册
           </span>
         </div>
+
+        <div className="login-mobile-footer">MANYOU · TRAVEL · AI · v1.0</div>
       </div>
     </AuthLayout>
   );

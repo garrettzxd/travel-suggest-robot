@@ -94,6 +94,17 @@ export default function RegisterPage() {
   return (
     <AuthLayout variant="register">
       <div className="register-page">
+        <div className="register-mobile-hero">
+          <div className="hero-pattern">
+            <span>HERO · 旅途风景</span>
+          </div>
+          <div className="hero-copy">
+            <div className="hero-kicker">START · 你的第一段旅程</div>
+            <div className="hero-title">把城市名，变成出发的勇气</div>
+            <div className="hero-sub">天气、景点、行程，三步给到你。</div>
+          </div>
+        </div>
+
         <div className="register-header">
           <span className="step-label">CREATE · ACCOUNT</span>
           <span className="step-progress">STEP 1 / 1</span>
@@ -107,6 +118,11 @@ export default function RegisterPage() {
           onFinish={handleSubmit}
           validateTrigger="onBlur"
         >
+          <div className="register-mobile-form-title">
+            <span>创建账号</span>
+            <span>STEP · 1 / 1</span>
+          </div>
+
           <div className="form-label">昵称</div>
           <Form.Item
             name="username"
@@ -177,6 +193,28 @@ export default function RegisterPage() {
             </Button>
           </Form.Item>
         </Form>
+
+        <div className="register-mobile-features">
+          <div className="feature scenic">
+            <span>景点</span>
+            <em>AI 精选</em>
+          </div>
+          <div className="feature weather">
+            <span>天气</span>
+            <em>实时 7 日</em>
+          </div>
+          <div className="feature itinerary">
+            <span>行程</span>
+            <em>一键规划</em>
+          </div>
+        </div>
+
+        <div className="register-login-row">
+          已有账号？
+          <span onClick={() => navigate('/login')}>直接登录</span>
+        </div>
+
+        <div className="register-mobile-footer">MANYOU · TRAVEL · AI · v1.0</div>
       </div>
     </AuthLayout>
   );

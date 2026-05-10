@@ -93,6 +93,20 @@ export default function AuthLayout({
       <div className="auth-right">
         <nav className="auth-right-nav">
           <span className="nav-brand">MANYOU · WEB</span>
+          {variant === 'register' ? (
+            <button
+              className="mobile-nav-back"
+              onClick={() => navigate('/login')}
+              aria-label="返回登录"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M15 6l-6 6 6 6" />
+              </svg>
+            </button>
+          ) : (
+            <span className="mobile-nav-spacer" />
+          )}
+          <span className="mobile-nav-title">{variant === 'login' ? '登录' : '注册'}</span>
           <div className="nav-actions">
             <button
               className={`nav-btn ${variant === 'login' ? 'active' : 'ghost'}`}

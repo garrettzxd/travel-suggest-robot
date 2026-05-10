@@ -2,6 +2,11 @@
   width: 100%;
 }
 
+.login-mobile-brand,
+.login-mobile-footer {
+  display: none;
+}
+
 .login-step-label {
   font-size: 11px;
   font-weight: 600;
@@ -62,6 +67,149 @@
   :global(.ant-input-prefix) {
     color: #bbb;
     margin-right: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .login-page {
+    box-sizing: border-box;
+    min-height: 100%;
+    padding: 22px 16px 20px;
+    background: #ededed;
+  }
+
+  .login-mobile-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+
+    .mobile-brand-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 11px;
+      background: #2a2a2a;
+      color: #fff;
+      display: grid;
+      place-items: center;
+
+      svg {
+        width: 22px;
+        height: 22px;
+      }
+    }
+
+    .mobile-brand-name {
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1;
+      color: #1f1f1f;
+    }
+
+    .mobile-brand-sub {
+      margin-top: 3px;
+      font-size: 10px;
+      color: #8a8a8a;
+      letter-spacing: 0.12em;
+    }
+  }
+
+  .login-step-label {
+    display: none;
+  }
+
+  .login-heading {
+    font-size: 22px;
+    line-height: 1.25;
+    margin-bottom: 6px;
+    color: #1f1f1f;
+  }
+
+  .login-sub {
+    font-size: 12.5px;
+    color: #555;
+    margin-bottom: 18px;
+  }
+
+  .login-form {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    padding: 16px 14px 14px;
+    border: 1px solid #dcdcdc;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 1px 8px rgba(42, 42, 42, 0.06);
+
+    .form-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: #8a8a8a;
+      text-transform: uppercase;
+    }
+
+    :global(.ant-form-item) {
+      margin-bottom: 12px;
+    }
+
+    :global(.ant-input-affix-wrapper) {
+      height: 42px;
+      border-color: #dcdcdc;
+      border-radius: 9px;
+      background: #fff;
+    }
+
+    :global(.ant-input) {
+      font-size: 13.5px;
+    }
+  }
+
+  .login-remember-row {
+    margin-top: 4px;
+    margin-bottom: 14px;
+
+    :global(.ant-checkbox-wrapper) {
+      font-size: 11.5px;
+      color: #555;
+    }
+
+    .forgot-link {
+      font-size: 11.5px;
+      color: #2a2a2a;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  .login-submit-btn {
+    height: 44px;
+    border-radius: 9px;
+    background: #2a2a2a;
+    border-color: #2a2a2a;
+    font-size: 14px;
+    box-shadow: 0 1px 6px rgba(42, 42, 42, 0.22);
+  }
+
+  .login-register-row {
+    margin-top: 18px;
+    font-size: 12px;
+    color: #555;
+
+    .register-link {
+      color: #2a2a2a;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+  }
+
+  .login-mobile-footer {
+    display: block;
+    margin-top: 22px;
+    text-align: center;
+    font-size: 10px;
+    color: #8a8a8a;
+    letter-spacing: 0.13em;
   }
 }
 
