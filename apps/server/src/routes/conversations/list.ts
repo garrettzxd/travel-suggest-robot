@@ -6,6 +6,7 @@ import {
   toConversation,
 } from "../../db/repositories/conversationRepo.js";
 import { findLastMessage } from "../../db/repositories/messageRepo.js";
+import { sendSuccess } from "../../utils/apiResponse.js";
 
 /** 截断 lastMessagePreview 的长度，避免侧边栏过长。 */
 const PREVIEW_MAX = 60;
@@ -29,7 +30,7 @@ export async function listConversationsRoute(ctx: Context): Promise<void> {
   );
 
   const body: ConversationListResponse = { items };
-  ctx.body = body;
+  sendSuccess(ctx, body);
 }
 
 /** 文本截断：连续空白压一格、超长追加省略号。 */

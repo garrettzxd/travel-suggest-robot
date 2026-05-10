@@ -29,6 +29,7 @@ import {
   createInitialState,
   type LangChainStreamEvent,
 } from "./types.js";
+import { badRequest, notFound, unauthorized } from "../../utils/apiResponse.js";
 
 /**
  * Koa 处理器。生命周期：
@@ -49,20 +50,15 @@ export async function chatRoute(ctx: Context): Promise<void> {
   const userId = ctx.state.userId;
   if (!userId) {
     // 兜底：理论上 authRequired 已拦截，这里仅防守
-    ctx.status = 401;
-    ctx.body = { message: "Unauthorized" };
-    return;
+    throw unauthorized();
   }
 
   const parsed = ChatRequestSchema.safeParse(ctx.request.body ?? {});
   if (!parsed.success) {
     log.warn("请求参数校验失败", parsed.error.flatten().fieldErrors);
-    ctx.status = 400;
-    ctx.body = {
-      message: "Invalid request body",
+    throw badRequest("Invalid request body", {
       errors: parsed.error.flatten().fieldErrors,
-    };
-    return;
+    });
   }
 
   const input = parsed.data;
@@ -73,9 +69,7 @@ export async function chatRoute(ctx: Context): Promise<void> {
     const owned = await findOwnedConversation(userId, input.conversationId);
     if (!owned) {
       // 不暴露归属信息——404 即可，无论 id 不存在还是不属于该用户
-      ctx.status = 404;
-      ctx.body = { message: "Conversation not found" };
-      return;
+      throw notFound("Conversation not found");
     }
     conversationId = owned.id;
   } else {

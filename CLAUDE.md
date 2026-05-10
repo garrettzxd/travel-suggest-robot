@@ -11,8 +11,9 @@
 
 - **Plan 模式产物必须落地到 `plans/` 目录**：在 plan 模式下生成的计划文档（PRD、实现方案、设计稿等）必须保存到项目根目录下的 `plans/` 目录中，不得散落在仓库其他位置。
   - 文件命名建议使用可读的中文或英文短语，能反映文档主题。
-  - 每一次计划生成必须放在plans子文件夹下，文件夹名称使用日期命名YYYY-MM-DD，同一个日期的生成的计划放在同一个文件夹内 
-  - 已存在 `plans/` 目录，直接写入即可，无需额外创建子目录（除非按主题归档需要）。
+  - 每一次计划生成必须归档到 `plans/YYYY-MM-DD/` 子目录，目录名使用当天日期。
+  - 如果当天日期目录不存在，先创建 `plans/YYYY-MM-DD/`；如果已存在，则直接归档到已有目录下。
+  - 同一天生成的计划文档统一放在同一个日期目录内。
 
 ## 项目探索优先级规范
 
@@ -47,7 +48,7 @@ travel-suggest-robot/
 - [apps/server/src/agent/](apps/server/src/agent/) — LangGraph agent、system prompt、TripCard / ItineraryCard 工具集。
 - [apps/server/src/routes/](apps/server/src/routes/) — HTTP / SSE 路由入口；核心聊天接口在 [apps/server/src/routes/chat/](apps/server/src/routes/chat/) 模块（按能力拆分：route / handlers / sseLifecycle / streamParsers / toolMeta / tripCard / messages / logger / types / legacyUpdatesEmitter）。
 - [apps/server/src/llm/](apps/server/src/llm/) — LLM 客户端与 provider 封装。
-- [apps/server/src/utils/](apps/server/src/utils/) — 日志、SSE 帧写入等通用工具。
+- [apps/server/src/utils/](apps/server/src/utils/) — 日志、SSE 帧写入、统一 API 响应 / 异常封装等通用工具。
 - [apps/server/src/scripts/](apps/server/src/scripts/) — LLM / QWeather 等第三方连通性自检脚本。
 - [apps/server/src/env.ts](apps/server/src/env.ts) — 环境变量加载与校验。
 
@@ -56,7 +57,7 @@ travel-suggest-robot/
 - [apps/web/src/main.tsx](apps/web/src/main.tsx) / [apps/web/src/App.tsx](apps/web/src/App.tsx) — React 根挂载与应用根组件。
 - [apps/web/src/chat/](apps/web/src/chat/) — 聊天页、输入栏、顶栏、SSE 消费 hook 与消息状态管理。
 - [apps/web/src/chat/cards/](apps/web/src/chat/cards/) — TripCard / ItineraryCard 结构化展示组件。
-- [apps/web/src/api/](apps/web/src/api/) — 后端 `/chat` SSE 客户端封装。
+- [apps/web/src/api/](apps/web/src/api/) — 后端 REST envelope 解析、未登录事件分发与 `/chat` SSE 客户端封装。
 - [apps/web/src/theme/](apps/web/src/theme/) — 前端设计 token。
 - [apps/web/src/index.css](apps/web/src/index.css) — 全局样式与 CSS 变量。
 - [apps/web/assets/weather-icons/](apps/web/assets/weather-icons/) — QWeather 官方图标资源。
@@ -68,6 +69,7 @@ travel-suggest-robot/
 - [packages/shared/src/chat.ts](packages/shared/src/chat.ts) — 聊天请求 / 历史消息相关类型。
 - [packages/shared/src/travel.ts](packages/shared/src/travel.ts) — `WeatherSnapshot` / `Attraction` / `TripCard` / `Itinerary` 等核心领域类型（**所有跨端 schema 都加在这里**）。
 - [packages/shared/src/sse.ts](packages/shared/src/sse.ts) — SSE 帧分隔符常量。
+- [packages/shared/src/api.ts](packages/shared/src/api.ts) — 普通 JSON 接口统一响应 envelope 与共享业务 code。
 
 ### 周边目录
 

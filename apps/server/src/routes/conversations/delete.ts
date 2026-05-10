@@ -4,6 +4,7 @@ import {
   deleteConversation,
   findOwnedConversation,
 } from "../../db/repositories/conversationRepo.js";
+import { badRequest, notFound, sendSuccess } from "../../utils/apiResponse.js";
 
 /** 删对话路由处理器。 */
 export async function deleteConversationRoute(ctx: Context): Promise<void> {
@@ -11,18 +12,14 @@ export async function deleteConversationRoute(ctx: Context): Promise<void> {
   const id = ctx.params.id;
 
   if (typeof id !== "string" || id.length === 0) {
-    ctx.status = 400;
-    ctx.body = { message: "Missing conversation id" };
-    return;
+    throw badRequest("Missing conversation id");
   }
 
   const conv = await findOwnedConversation(userId, id);
   if (!conv) {
-    ctx.status = 404;
-    ctx.body = { message: "Conversation not found" };
-    return;
+    throw notFound("Conversation not found");
   }
 
   await deleteConversation(id);
-  ctx.status = 204;
+  sendSuccess(ctx, {});
 }

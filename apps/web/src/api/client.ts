@@ -8,53 +8,37 @@ import type {
   LoginRequest,
   RegisterRequest,
 } from '@travel/shared';
+import { ApiError, postJson, readApiData } from './http';
 
-async function readJson<T>(res: Response): Promise<T> {
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(text || `Request failed (${res.status})`);
-  }
-  return (text ? JSON.parse(text) : {}) as T;
-}
-
-async function postJson<TResponse, TBody extends object>(
-  url: string,
-  body: TBody,
-): Promise<TResponse> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  return readJson<TResponse>(res);
-}
-
+/** GET /api/auth/me，保留旧调用方需要的 AuthResponse 形态。 */
 export async function getMe(): Promise<AuthResponse> {
-  const res = await fetch('/api/auth/me');
-  return readJson<AuthResponse>(res);
+  const res = await fetch('/api/auth/me', { credentials: 'include' });
+  return readApiData<AuthResponse>(res);
 }
 
+/** POST /api/auth/login，保留旧调用方需要的 AuthResponse 形态。 */
 export async function login(body: LoginRequest): Promise<AuthResponse> {
   return postJson<AuthResponse, LoginRequest>('/api/auth/login', body);
 }
 
+/** POST /api/auth/register，保留旧调用方需要的 AuthResponse 形态。 */
 export async function register(body: RegisterRequest): Promise<AuthResponse> {
   return postJson<AuthResponse, RegisterRequest>('/api/auth/register', body);
 }
 
+/** POST /api/auth/logout。 */
 export async function logout(): Promise<void> {
-  const res = await fetch('/api/auth/logout', { method: 'POST' });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(text || `Logout failed (${res.status})`);
-  }
+  const res = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  await readApiData<Record<string, never>>(res);
 }
 
+/** GET /api/conversations，返回当前用户最近会话。 */
 export async function listConversations(): Promise<ConversationListResponse> {
-  const res = await fetch('/api/conversations');
-  return readJson<ConversationListResponse>(res);
+  const res = await fetch('/api/conversations', { credentials: 'include' });
+  return readApiData<ConversationListResponse>(res);
 }
 
+/** POST /api/conversations，显式创建一个空会话。 */
 export async function createConversation(
   body: CreateConversationRequest = {},
 ): Promise<CreateConversationResponse> {
@@ -64,12 +48,15 @@ export async function createConversation(
   );
 }
 
+/** GET /api/conversations/:id，读取历史消息和卡片制品。 */
 export async function getConversation(id: string): Promise<ConversationDetailResponse> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`);
-  return readJson<ConversationDetailResponse>(res);
+  const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`, {
+    credentials: 'include',
+  });
+  return readApiData<ConversationDetailResponse>(res);
 }
 
-// 发起聊天请求并返回 SSE 响应体，调用方负责逐帧读取流内容。
+/** 发起聊天请求并返回 SSE 响应体，调用方负责逐帧读取流内容。 */
 export async function postChat(
   body: ChatRequest,
   signal?: AbortSignal,
@@ -85,9 +72,12 @@ export async function postChat(
     signal,
   });
 
-  if (!res.ok || !res.body) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Chat request failed (${res.status}): ${text}`);
+  if (!res.ok) {
+    await readApiData<unknown>(res);
+  }
+
+  if (!res.body) {
+    throw new ApiError(`Chat request failed (${res.status}): empty response body`, res.status, res.status, {});
   }
 
   return res.body;

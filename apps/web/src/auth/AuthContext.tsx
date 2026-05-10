@@ -1,7 +1,9 @@
 import { createContext, useCallback, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { AuthUser } from '@travel/shared';
 import { getMe, postLogout } from '../api/authApi';
+import { onUnauthorized } from '../api/http';
 
 /** 全局认证状态的上下文值。 */
 export interface AuthContextValue {
@@ -24,6 +26,7 @@ export const AuthContext = createContext<AuthContextValue>({
 
 /** 包裹整个应用，负责启动时恢复会话并提供 login / logout 方法。 */
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -33,6 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .catch(() => setUser(null))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    return onUnauthorized(() => {
+      setUser(null);
+      navigate('/login', { replace: true });
+    });
+  }, [navigate]);
 
   const login = useCallback((u: AuthUser) => {
     setUser(u);

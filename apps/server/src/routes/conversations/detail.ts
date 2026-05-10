@@ -9,6 +9,7 @@ import {
   listMessagesByConversation,
   toChatMessageWithCards,
 } from "../../db/repositories/messageRepo.js";
+import { badRequest, notFound, sendSuccess } from "../../utils/apiResponse.js";
 
 /** 详情路由处理器。归属权失败统一 404，避免泄露 id 是否存在。 */
 export async function detailConversationRoute(ctx: Context): Promise<void> {
@@ -16,16 +17,12 @@ export async function detailConversationRoute(ctx: Context): Promise<void> {
   const id = ctx.params.id;
 
   if (typeof id !== "string" || id.length === 0) {
-    ctx.status = 400;
-    ctx.body = { message: "Missing conversation id" };
-    return;
+    throw badRequest("Missing conversation id");
   }
 
   const conv = await findOwnedConversation(userId, id);
   if (!conv) {
-    ctx.status = 404;
-    ctx.body = { message: "Conversation not found" };
-    return;
+    throw notFound("Conversation not found");
   }
 
   const rows = await listMessagesByConversation(id);
@@ -33,5 +30,5 @@ export async function detailConversationRoute(ctx: Context): Promise<void> {
     conversation: toConversation(conv),
     messages: rows.map(toChatMessageWithCards),
   };
-  ctx.body = body;
+  sendSuccess(ctx, body);
 }

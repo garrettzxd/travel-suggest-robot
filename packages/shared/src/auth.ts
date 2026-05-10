@@ -22,7 +22,7 @@ export interface LoginRequest {
   password: string;
 }
 
-/** 注册 / 登录 / GET /api/auth/me 的统一响应。 */
+/** 注册 / 登录 / GET /api/auth/me 的 data 载荷。 */
 export interface AuthResponse {
   user: AuthUser;
 }

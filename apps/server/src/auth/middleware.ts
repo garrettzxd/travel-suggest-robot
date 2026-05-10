@@ -3,6 +3,7 @@
 // 失败时直接 401，不抛错给外层（避免污染日志）。
 import type { Context, Next } from "koa";
 import { env } from "../env.js";
+import { unauthorized } from "../utils/apiResponse.js";
 import { InvalidAuthTokenError, verifyAuthToken } from "./jwt.js";
 
 /** 把 Koa ctx.state 类型扩展，便于业务 handler 直接 ctx.state.userId 取值。 */
@@ -21,9 +22,7 @@ declare module "koa" {
 export async function authRequired(ctx: Context, next: Next): Promise<void> {
   const token = ctx.cookies.get(env.COOKIE_NAME);
   if (!token) {
-    ctx.status = 401;
-    ctx.body = { message: "Unauthorized: missing token" };
-    return;
+    throw unauthorized("Unauthorized: missing token");
   }
 
   try {
@@ -33,9 +32,7 @@ export async function authRequired(ctx: Context, next: Next): Promise<void> {
     await next();
   } catch (err) {
     if (err instanceof InvalidAuthTokenError) {
-      ctx.status = 401;
-      ctx.body = { message: "Unauthorized: invalid token" };
-      return;
+      throw unauthorized("Unauthorized: invalid token");
     }
     throw err;
   }

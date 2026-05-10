@@ -10,8 +10,8 @@ import PrivacyPage from './pages/PrivacyPage';
 /** 应用根组件：装配认证上下文、路由树与受保护路由守卫。 */
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <Routes>
           {/* 公开路由 */}
           <Route path="/login" element={<LoginPage />} />
@@ -25,7 +25,7 @@ export default function App() {
           {/* 404 兜底 */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

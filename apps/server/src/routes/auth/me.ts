@@ -2,6 +2,7 @@
 import type { Context } from "koa";
 import type { AuthResponse } from "@travel/shared";
 import { findUserById, toAuthUser } from "../../db/repositories/userRepo.js";
+import { sendSuccess, unauthorized } from "../../utils/apiResponse.js";
 
 /**
  * me 路由处理器。
@@ -12,19 +13,14 @@ export async function meRoute(ctx: Context): Promise<void> {
   const userId = ctx.state.userId;
   if (!userId) {
     // 防御式分支：authRequired 已保证此处必有值
-    ctx.status = 401;
-    ctx.body = { message: "Unauthorized" };
-    return;
+    throw unauthorized();
   }
 
   const user = await findUserById(userId);
   if (!user) {
-    ctx.status = 401;
-    ctx.body = { message: "User no longer exists" };
-    return;
+    throw unauthorized("User no longer exists");
   }
 
-  ctx.status = 200;
   const body: AuthResponse = { user: toAuthUser(user) };
-  ctx.body = body;
+  sendSuccess(ctx, body);
 }

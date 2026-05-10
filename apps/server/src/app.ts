@@ -13,6 +13,7 @@ import { bodyParser } from "@koa/bodyparser";
 import pinoLogger from "koa-pino-logger";
 import { env } from "./env.js";
 import { applyRouters } from "./routes/index.js";
+import { apiErrorMiddleware } from "./utils/apiResponse.js";
 
 const app = new Koa();
 
@@ -27,6 +28,8 @@ app.use(
     autoLogging: false,
   }),
 );
+
+app.use(apiErrorMiddleware);
 
 // dev 环境下 web (5173) 与 server (3001) 跨 origin，必须放行 + 允许携带 Cookie
 app.use(

@@ -1,4 +1,5 @@
 import type { Middleware } from "koa";
+import { badRequest } from "../utils/apiResponse.js";
 
 const MAX_MESSAGE_LENGTH = 5000;
 const MAX_HISTORY_LENGTH = 100;
@@ -26,18 +27,14 @@ export const inputSecurityMiddleware: Middleware = async (ctx, next) => {
   if (typeof body.message === "string") {
     const message = sanitizeText(body.message);
     if (message.length > MAX_MESSAGE_LENGTH) {
-      ctx.status = 400;
-      ctx.body = { message: `message must be at most ${MAX_MESSAGE_LENGTH} characters` };
-      return;
+      throw badRequest(`message must be at most ${MAX_MESSAGE_LENGTH} characters`);
     }
     body.message = message;
   }
 
   if (Array.isArray(body.history)) {
     if (body.history.length > MAX_HISTORY_LENGTH) {
-      ctx.status = 400;
-      ctx.body = { message: `history must contain at most ${MAX_HISTORY_LENGTH} messages` };
-      return;
+      throw badRequest(`history must contain at most ${MAX_HISTORY_LENGTH} messages`);
     }
 
     for (const entry of body.history) {

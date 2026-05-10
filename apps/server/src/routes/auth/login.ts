@@ -7,6 +7,7 @@ import { setAuthCookie } from "../../auth/cookie.js";
 import { signAuthToken } from "../../auth/jwt.js";
 import { verifyPassword } from "../../auth/password.js";
 import { findUserByEmail, toAuthUser } from "../../db/repositories/userRepo.js";
+import { badRequest, invalidCredentials, sendSuccess } from "../../utils/apiResponse.js";
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -17,12 +18,9 @@ const LoginSchema = z.object({
 export async function loginRoute(ctx: Context): Promise<void> {
   const parsed = LoginSchema.safeParse(ctx.request.body ?? {});
   if (!parsed.success) {
-    ctx.status = 400;
-    ctx.body = {
-      message: "Invalid request body",
+    throw badRequest("Invalid request body", {
       errors: parsed.error.flatten().fieldErrors,
-    };
-    return;
+    });
   }
 
   const { email, password } = parsed.data;
@@ -30,22 +28,17 @@ export async function loginRoute(ctx: Context): Promise<void> {
 
   // 不区分「邮箱不存在」与「密码错误」，统一返回 401 + 同一文案
   if (!user) {
-    ctx.status = 401;
-    ctx.body = { message: "Invalid email or password" };
-    return;
+    throw invalidCredentials();
   }
 
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) {
-    ctx.status = 401;
-    ctx.body = { message: "Invalid email or password" };
-    return;
+    throw invalidCredentials();
   }
 
   const token = await signAuthToken(user.id, user.email);
   setAuthCookie(ctx, token);
 
-  ctx.status = 200;
   const body: AuthResponse = { user: toAuthUser(user) };
-  ctx.body = body;
+  sendSuccess(ctx, body);
 }

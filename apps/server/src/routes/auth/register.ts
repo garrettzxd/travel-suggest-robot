@@ -6,6 +6,7 @@ import { setAuthCookie } from "../../auth/cookie.js";
 import { signAuthToken } from "../../auth/jwt.js";
 import { hashPassword } from "../../auth/password.js";
 import { createUser, findUserByEmail, toAuthUser } from "../../db/repositories/userRepo.js";
+import { badRequest, conflict, sendSuccess } from "../../utils/apiResponse.js";
 
 /**
  * 请求体 schema：
@@ -23,21 +24,16 @@ const RegisterSchema = z.object({
 export async function registerRoute(ctx: Context): Promise<void> {
   const parsed = RegisterSchema.safeParse(ctx.request.body ?? {});
   if (!parsed.success) {
-    ctx.status = 400;
-    ctx.body = {
-      message: "Invalid request body",
+    throw badRequest("Invalid request body", {
       errors: parsed.error.flatten().fieldErrors,
-    };
-    return;
+    });
   }
 
   const { email, username, password } = parsed.data;
 
   const existing = await findUserByEmail(email);
   if (existing) {
-    ctx.status = 409;
-    ctx.body = { message: "Email already registered" };
-    return;
+    throw conflict("Email already registered");
   }
 
   const passwordHash = await hashPassword(password);
@@ -46,7 +42,6 @@ export async function registerRoute(ctx: Context): Promise<void> {
   const token = await signAuthToken(user.id, user.email);
   setAuthCookie(ctx, token);
 
-  ctx.status = 201;
   const body: AuthResponse = { user: toAuthUser(user) };
-  ctx.body = body;
+  sendSuccess(ctx, body, 201);
 }

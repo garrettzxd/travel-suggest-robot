@@ -22,7 +22,7 @@ export interface ConversationListItem extends Conversation {
   lastMessagePreview?: string;
 }
 
-/** GET /api/conversations 响应：固定返回最近 20 条，不分页。 */
+/** GET /api/conversations 的 data 载荷：固定返回最近 20 条，不分页。 */
 export interface ConversationListResponse {
   items: ConversationListItem[];
 }
@@ -38,7 +38,7 @@ export interface ChatMessageWithCards extends ChatMessage {
   food?: FoodRecommendation;
 }
 
-/** GET /api/conversations/:id 响应。 */
+/** GET /api/conversations/:id 的 data 载荷。 */
 export interface ConversationDetailResponse {
   conversation: Conversation;
   messages: ChatMessageWithCards[];
@@ -49,7 +49,7 @@ export interface CreateConversationRequest {
   title?: string;
 }
 
-/** POST /api/conversations 响应。 */
+/** POST /api/conversations 的 data 载荷。 */
 export interface CreateConversationResponse {
   conversation: Conversation;
 }

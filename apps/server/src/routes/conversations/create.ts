@@ -6,6 +6,7 @@ import {
   createConversation,
   toConversation,
 } from "../../db/repositories/conversationRepo.js";
+import { badRequest, sendSuccess } from "../../utils/apiResponse.js";
 
 const CreateSchema = z.object({
   title: z.string().min(1).max(80).optional(),
@@ -17,16 +18,12 @@ export async function createConversationRoute(ctx: Context): Promise<void> {
 
   const parsed = CreateSchema.safeParse(ctx.request.body ?? {});
   if (!parsed.success) {
-    ctx.status = 400;
-    ctx.body = {
-      message: "Invalid request body",
+    throw badRequest("Invalid request body", {
       errors: parsed.error.flatten().fieldErrors,
-    };
-    return;
+    });
   }
 
   const row = await createConversation({ userId, title: parsed.data.title });
-  ctx.status = 201;
   const body: CreateConversationResponse = { conversation: toConversation(row) };
-  ctx.body = body;
+  sendSuccess(ctx, body, 201);
 }

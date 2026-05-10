@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import type { ChatMessageWithCards, ChatRequest } from '@travel/shared';
 import { postChat } from '../api/client';
+import { isUnauthorizedError } from '../api/http';
 import type { ToolTraceEntry, TravelChatMessage } from './types';
 import { readSseFrames } from './sse/parser';
 import { sseEventHandlers } from './sse/eventHandlers';
@@ -152,6 +153,7 @@ export function useTravelAgent(options: UseTravelAgentOptions = {}) {
       }
     } catch (error) {
       if ((error as { name?: string }).name !== 'AbortError') {
+        if (isUnauthorizedError(error)) return;
         const messageText = error instanceof Error ? error.message : String(error);
         setToolTrace((prev) => markRunningToolsAsError(prev));
         setMessages((prev) =>
