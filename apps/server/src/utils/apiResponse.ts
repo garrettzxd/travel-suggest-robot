@@ -71,7 +71,7 @@ export function unauthorized(message = "Unauthorized"): ApiError {
 }
 
 /** 登录凭证错误，不触发前端全局未登录跳转。 */
-export function invalidCredentials(message = "Invalid email or password"): ApiError {
+export function invalidCredentials(message = "账号或密码错误"): ApiError {
   return new ApiError({
     status: 401,
     code: API_CODE.INVALID_CREDENTIALS,

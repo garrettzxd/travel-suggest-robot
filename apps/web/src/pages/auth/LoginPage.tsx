@@ -35,6 +35,7 @@ export default function LoginPage() {
   const auth = useAuth();
   const [loading, setLoading] = useState(false);
   const [form] = Form.useForm<LoginFormValues>();
+  const [messageApi, messageContextHolder] = message.useMessage();
 
   /** 账号登录表单提交。 */
   const handleSubmit = async (values: LoginFormValues) => {
@@ -44,7 +45,7 @@ export default function LoginPage() {
       auth.login(user);
       navigate('/', { replace: true });
     } catch (err) {
-      message.error(err instanceof Error ? err.message : '登录失败，请稍后重试');
+      messageApi.error(err instanceof Error ? err.message : '登录失败，请稍后重试');
     } finally {
       setLoading(false);
     }
@@ -52,6 +53,7 @@ export default function LoginPage() {
 
   return (
     <AuthLayout variant="login">
+      {messageContextHolder}
       <div className="login-page">
         <div className="login-mobile-brand">
           <div className="mobile-brand-icon">
@@ -111,7 +113,7 @@ export default function LoginPage() {
             </Form.Item>
             <span
               className="forgot-link"
-              onClick={() => message.info('暂不支持找回密码，请联系管理员')}
+              onClick={() => messageApi.info('暂不支持找回密码，请联系管理员')}
             >
               忘记密码？
             </span>
