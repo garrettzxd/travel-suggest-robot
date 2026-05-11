@@ -7,10 +7,12 @@ import RegisterPage from './pages/auth/RegisterPage';
 import TermsPage from './pages/TermsPage';
 import PrivacyPage from './pages/PrivacyPage';
 
+const routerBasename = import.meta.env.BASE_URL.replace(/\/$/, '') || '/';
+
 /** 应用根组件：装配认证上下文、路由树与受保护路由守卫。 */
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={routerBasename}>
       <AuthProvider>
         <Routes>
           {/* 公开路由 */}

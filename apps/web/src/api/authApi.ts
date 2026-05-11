@@ -1,9 +1,9 @@
 import type { AuthUser, LoginRequest, RegisterRequest } from '@travel/shared';
-import { isUnauthorizedError, postJson, readApiData } from './http';
+import { appPath, isUnauthorizedError, postJson, readApiData } from './http';
 
 /** GET /api/auth/me — 恢复当前会话，返回用户信息；未登录返回 null。 */
 export async function getMe(): Promise<AuthUser | null> {
-  const res = await fetch('/api/auth/me', { credentials: 'include' });
+  const res = await fetch(appPath('/api/auth/me'), { credentials: 'include' });
   try {
     const data = await readApiData<{ user: AuthUser }>(res, { notifyUnauthorized: false });
     return data.user;
@@ -27,6 +27,6 @@ export async function postRegister(body: RegisterRequest): Promise<AuthUser> {
 
 /** POST /api/auth/logout — 清除服务端 Cookie，无返回值。 */
 export async function postLogout(): Promise<void> {
-  const res = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  const res = await fetch(appPath('/api/auth/logout'), { method: 'POST', credentials: 'include' });
   await readApiData<Record<string, never>>(res);
 }

@@ -6,6 +6,14 @@ interface ReadApiOptions {
   notifyUnauthorized?: boolean;
 }
 
+/** 按 Vite base 拼接应用内绝对路径，支持部署在 /travel/ 这类子路径下。 */
+export function appPath(path: string): string {
+  const base = import.meta.env.BASE_URL;
+  const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}` || normalizedPath;
+}
+
 /** 前端 API 错误，保留 HTTP status、业务 code 和服务端 data。 */
 export class ApiError extends Error {
   status: number;
@@ -81,7 +89,7 @@ export async function postJson<TResponse, TBody extends object>(
   url: string,
   body: TBody,
 ): Promise<TResponse> {
-  const res = await fetch(url, {
+  const res = await fetch(appPath(url), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',

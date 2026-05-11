@@ -8,11 +8,11 @@ import type {
   LoginRequest,
   RegisterRequest,
 } from '@travel/shared';
-import { ApiError, postJson, readApiData } from './http';
+import { ApiError, appPath, postJson, readApiData } from './http';
 
 /** GET /api/auth/me，保留旧调用方需要的 AuthResponse 形态。 */
 export async function getMe(): Promise<AuthResponse> {
-  const res = await fetch('/api/auth/me', { credentials: 'include' });
+  const res = await fetch(appPath('/api/auth/me'), { credentials: 'include' });
   return readApiData<AuthResponse>(res);
 }
 
@@ -28,13 +28,13 @@ export async function register(body: RegisterRequest): Promise<AuthResponse> {
 
 /** POST /api/auth/logout。 */
 export async function logout(): Promise<void> {
-  const res = await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  const res = await fetch(appPath('/api/auth/logout'), { method: 'POST', credentials: 'include' });
   await readApiData<Record<string, never>>(res);
 }
 
 /** GET /api/conversations，返回当前用户最近会话。 */
 export async function listConversations(): Promise<ConversationListResponse> {
-  const res = await fetch('/api/conversations', { credentials: 'include' });
+  const res = await fetch(appPath('/api/conversations'), { credentials: 'include' });
   return readApiData<ConversationListResponse>(res);
 }
 
@@ -50,7 +50,7 @@ export async function createConversation(
 
 /** GET /api/conversations/:id，读取历史消息和卡片制品。 */
 export async function getConversation(id: string): Promise<ConversationDetailResponse> {
-  const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`, {
+  const res = await fetch(appPath(`/api/conversations/${encodeURIComponent(id)}`), {
     credentials: 'include',
   });
   return readApiData<ConversationDetailResponse>(res);
@@ -61,7 +61,7 @@ export async function postChat(
   body: ChatRequest,
   signal?: AbortSignal,
 ): Promise<ReadableStream<Uint8Array>> {
-  const res = await fetch('/api/chat', {
+  const res = await fetch(appPath('/api/chat'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
