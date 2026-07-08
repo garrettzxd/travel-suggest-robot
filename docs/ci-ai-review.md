@@ -32,6 +32,8 @@ AI CR 脚本也兼容 `https://api.moonshot.cn`，会自动补全为 `https://ap
 
 脚本默认不传 `temperature`。部分 Kimi 模型会拒绝非 `1` 的 temperature，例如返回 `invalid temperature: only 1 is allowed for this model`。
 
+脚本默认传入 `thinking: { "type": "disabled" }`。`kimi-k2.6` 会返回 `reasoning_content`，如果不关闭 thinking，可能把输出 token 几乎全部消耗在 reasoning 上，导致 `choices[0].message.content` 为空。
+
 也可以使用更通用的命名：
 
 ```text
@@ -49,7 +51,7 @@ AI_REVIEW_BASE_URL
 ```text
 AI_REVIEW_MAX_DIFF_CHARS=20000
 AI_REVIEW_LANGUAGE=zh-CN
-AI_REVIEW_MAX_OUTPUT_TOKENS=6000
+AI_REVIEW_MAX_OUTPUT_TOKENS=2000
 ```
 
 ## 触发规则

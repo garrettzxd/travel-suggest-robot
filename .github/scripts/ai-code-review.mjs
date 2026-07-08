@@ -75,7 +75,19 @@ function renderList(items) {
   if (list.length === 0) {
     return "无。";
   }
-  return list.map((item, index) => `${index + 1}. ${String(item).trim()}`).join("\n");
+  return list.map((item, index) => {
+    if (typeof item === "string") {
+      return `${index + 1}. ${item.trim()}`;
+    }
+
+    if (item && typeof item === "object") {
+      const title = item.title || item.summary || item.issue || item.problem || "问题";
+      const body = item.body || item.detail || item.description || item.suggestion || "";
+      return `${index + 1}. ${String(title).trim()}${body ? `：${String(body).trim()}` : ""}`;
+    }
+
+    return `${index + 1}. ${String(item).trim()}`;
+  }).join("\n");
 }
 
 function normalizeInlineComments(comments) {
@@ -183,7 +195,7 @@ async function main() {
   const baseUrl = firstEnv("AI_REVIEW_BASE_URL", "MOONSHOT_BASE_URL") || "https://api.moonshot.cn/v1";
   const chatCompletionsUrl = buildChatCompletionsUrl(baseUrl);
   const maxDiffChars = Number.parseInt(process.env.AI_REVIEW_MAX_DIFF_CHARS || "20000", 10);
-  const maxOutputTokens = Number.parseInt(process.env.AI_REVIEW_MAX_OUTPUT_TOKENS || "6000", 10);
+  const maxOutputTokens = Number.parseInt(process.env.AI_REVIEW_MAX_OUTPUT_TOKENS || "2000", 10);
   const language = process.env.AI_REVIEW_LANGUAGE || "zh-CN";
 
   const [changedFiles, rawDiff] = await Promise.all([
@@ -215,7 +227,9 @@ async function main() {
           content: prompt,
         },
       ],
-      max_tokens: Number.isFinite(maxOutputTokens) ? maxOutputTokens : 6000,
+      response_format: { type: "json_object" },
+      thinking: { type: "disabled" },
+      max_completion_tokens: Number.isFinite(maxOutputTokens) ? maxOutputTokens : 2000,
     }),
   });
 
