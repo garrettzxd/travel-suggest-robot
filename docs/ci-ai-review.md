@@ -30,6 +30,8 @@ MOONSHOT_BASE_URL=https://api.moonshot.cn/v1
 
 AI CR 脚本也兼容 `https://api.moonshot.cn`，会自动补全为 `https://api.moonshot.cn/v1/chat/completions`。
 
+脚本默认不传 `temperature`。部分 Kimi 模型会拒绝非 `1` 的 temperature，例如返回 `invalid temperature: only 1 is allowed for this model`。
+
 也可以使用更通用的命名：
 
 ```text
