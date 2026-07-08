@@ -8,10 +8,20 @@ function getArg(name, fallback = undefined) {
   return index >= 0 ? process.argv[index + 1] : fallback;
 }
 
-function requiredEnv(name) {
-  const value = process.env[name];
+function firstEnv(...names) {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function requiredAnyEnv(...names) {
+  const value = firstEnv(...names);
   if (!value) {
-    throw new Error(`${name} is required`);
+    throw new Error(`${names.join(" or ")} is required`);
   }
   return value;
 }
@@ -103,9 +113,10 @@ async function main() {
   const diffPath = getArg("--diff", "pr.diff");
   const outPath = getArg("--out", "review.md");
 
-  const apiKey = requiredEnv("AI_REVIEW_API_KEY");
-  const model = requiredEnv("AI_REVIEW_MODEL");
-  const chatCompletionsUrl = buildChatCompletionsUrl(requiredEnv("AI_REVIEW_BASE_URL"));
+  const apiKey = requiredAnyEnv("AI_REVIEW_API_KEY", "MOONSHOT_API_KEY");
+  const model = requiredAnyEnv("AI_REVIEW_MODEL", "MOONSHOT_MODEL");
+  const baseUrl = firstEnv("AI_REVIEW_BASE_URL", "MOONSHOT_BASE_URL") || "https://api.moonshot.cn/v1";
+  const chatCompletionsUrl = buildChatCompletionsUrl(baseUrl);
   const maxDiffChars = Number.parseInt(process.env.AI_REVIEW_MAX_DIFF_CHARS || "100000", 10);
   const language = process.env.AI_REVIEW_LANGUAGE || "zh-CN";
 

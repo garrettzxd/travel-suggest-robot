@@ -22,7 +22,7 @@ jobs:
     name: Review PR diff
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    if: github.event.pull_request.draft == false
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
       - name: Checkout
@@ -48,9 +48,12 @@ jobs:
 
       - name: Generate AI review
         env:
-          AI_REVIEW_API_KEY: ${{ secrets.AI_REVIEW_API_KEY || secrets.MOONSHOT_API_KEY }}
-          AI_REVIEW_MODEL: ${{ secrets.AI_REVIEW_MODEL || secrets.MOONSHOT_MODEL }}
-          AI_REVIEW_BASE_URL: ${{ secrets.AI_REVIEW_BASE_URL || secrets.MOONSHOT_BASE_URL }}
+          AI_REVIEW_API_KEY: ${{ secrets.AI_REVIEW_API_KEY }}
+          AI_REVIEW_MODEL: ${{ secrets.AI_REVIEW_MODEL }}
+          AI_REVIEW_BASE_URL: ${{ secrets.AI_REVIEW_BASE_URL }}
+          MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
+          MOONSHOT_MODEL: ${{ secrets.MOONSHOT_MODEL }}
+          MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
           AI_REVIEW_MAX_DIFF_CHARS: ${{ vars.AI_REVIEW_MAX_DIFF_CHARS || '100000' }}
           AI_REVIEW_LANGUAGE: ${{ vars.AI_REVIEW_LANGUAGE || 'zh-CN' }}
         run: node .github/scripts/ai-code-review.mjs --files changed-files.txt --diff pr.diff --out review.md

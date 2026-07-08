@@ -56,6 +56,8 @@ AI_REVIEW_LANGUAGE=zh-CN
 - PR 指向 `main`
 - push 到 `main`
 
+项目是 pnpm workspace。`@travel/shared` 的类型声明指向 `packages/shared/dist`，因此 `pnpm typecheck` 会先执行 `pnpm build:shared`，再执行全仓 `pnpm -r typecheck`。否则 fresh clone 的 CI 环境中 web/server 可能找不到 `@travel/shared` 的声明文件。
+
 `AI Code Review` 会在以下 PR 事件触发：
 
 - `opened`
@@ -64,6 +66,8 @@ AI_REVIEW_LANGUAGE=zh-CN
 - `ready_for_review`
 
 Draft PR 会跳过 AI CR。
+
+Fork PR 也会跳过 AI CR。GitHub 在 `pull_request` 事件中不会向 fork PR 暴露仓库 Secrets，且 `GITHUB_TOKEN` 通常没有写评论权限。
 
 ## 敏感文件过滤
 
@@ -96,3 +100,21 @@ AI CR 评论包含固定标记：
 - 不要把 `AI Code Review` 设置为必需检查。
 
 AI CR 依赖外部模型服务，可能受余额、限流、网络波动影响。它更适合作为辅助审查，而不是第一阶段的硬门禁。
+
+## 常见报错
+
+### `AI_REVIEW_API_KEY or MOONSHOT_API_KEY is required`
+
+说明 workflow 没有拿到大模型 API Key。请检查：
+
+- Secret 是否配置在 `Settings -> Secrets and variables -> Actions -> Secrets`，不是 Variables。
+- Secret 名称是否为 `MOONSHOT_API_KEY` 或 `AI_REVIEW_API_KEY`。
+- 当前 PR 是否来自 fork。fork PR 默认拿不到仓库 Secrets。
+
+### `Resource not accessible by integration`
+
+通常说明本次 workflow 的 `GITHUB_TOKEN` 没有写 PR 评论权限。请检查：
+
+- 仓库 `Settings -> Actions -> General -> Workflow permissions` 是否为 `Read and write permissions`。
+- workflow 是否声明了 `issues: write`。
+- 当前 PR 是否来自 fork。fork PR 的 token 通常不能写仓库评论。
