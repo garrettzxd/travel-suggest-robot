@@ -1,0 +1,98 @@
+# CI 与 AI Code Review
+
+本项目使用 GitHub Actions 完成第一阶段 CI/CD 能力：
+
+- `CI`：对 PR 和 main 分支执行依赖安装、类型检查和构建。
+- `AI Code Review`：对 PR diff 调用大模型生成审查意见，并发布或更新同一条 PR 评论。
+
+## Workflow 文件
+
+```text
+.github/workflows/ci.yml
+.github/workflows/ai-code-review.yml
+```
+
+## 必需 Secrets
+
+在 GitHub 仓库 `Settings -> Secrets and variables -> Actions` 中配置：
+
+```text
+MOONSHOT_API_KEY
+MOONSHOT_MODEL
+MOONSHOT_BASE_URL
+```
+
+Kimi 推荐配置：
+
+```text
+MOONSHOT_BASE_URL=https://api.moonshot.cn/v1
+```
+
+AI CR 脚本也兼容 `https://api.moonshot.cn`，会自动补全为 `https://api.moonshot.cn/v1/chat/completions`。
+
+也可以使用更通用的命名：
+
+```text
+AI_REVIEW_API_KEY
+AI_REVIEW_MODEL
+AI_REVIEW_BASE_URL
+```
+
+如果两组都存在，workflow 会优先使用 `AI_REVIEW_*`。
+
+## 可选 Variables
+
+在 GitHub 仓库 `Settings -> Secrets and variables -> Actions -> Variables` 中配置：
+
+```text
+AI_REVIEW_MAX_DIFF_CHARS=100000
+AI_REVIEW_LANGUAGE=zh-CN
+```
+
+## 触发规则
+
+`CI` 会在以下场景触发：
+
+- PR 指向 `main`
+- push 到 `main`
+
+`AI Code Review` 会在以下 PR 事件触发：
+
+- `opened`
+- `synchronize`
+- `reopened`
+- `ready_for_review`
+
+Draft PR 会跳过 AI CR。
+
+## 敏感文件过滤
+
+AI CR 不会把以下文件的 diff 发送给大模型：
+
+- `.env`
+- `.env.*`
+- `secrets/**`
+- `*.pem`
+- `*.key`
+- `pnpm-lock.yaml`
+
+`pnpm-lock.yaml` 仍会出现在变更文件列表中，但不会发送完整 diff。
+
+## 评论策略
+
+AI CR 评论包含固定标记：
+
+```md
+<!-- ai-code-review -->
+```
+
+每次 PR 更新时，脚本会优先更新已有 AI CR 评论，避免重复刷屏。
+
+## 合并建议
+
+第一阶段建议：
+
+- 将 `CI` 设置为 main 分支保护的必需检查。
+- 不要把 `AI Code Review` 设置为必需检查。
+
+AI CR 依赖外部模型服务，可能受余额、限流、网络波动影响。它更适合作为辅助审查，而不是第一阶段的硬门禁。

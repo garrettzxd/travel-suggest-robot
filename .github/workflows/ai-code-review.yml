@@ -1,0 +1,62 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+
+concurrency:
+  group: ai-code-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Review PR diff
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.event.pull_request.draft == false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Prepare PR diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-status "$BASE_SHA...$HEAD_SHA" > changed-files.txt
+          git diff --unified=80 "$BASE_SHA...$HEAD_SHA" -- . \
+            ':(glob,exclude)**/.env' \
+            ':(glob,exclude)**/.env.*' \
+            ':(glob,exclude)secrets/**' \
+            ':(glob,exclude)**/*.pem' \
+            ':(glob,exclude)**/*.key' \
+            ':(glob,exclude)pnpm-lock.yaml' \
+            > pr.diff
+
+      - name: Generate AI review
+        env:
+          AI_REVIEW_API_KEY: ${{ secrets.AI_REVIEW_API_KEY || secrets.MOONSHOT_API_KEY }}
+          AI_REVIEW_MODEL: ${{ secrets.AI_REVIEW_MODEL || secrets.MOONSHOT_MODEL }}
+          AI_REVIEW_BASE_URL: ${{ secrets.AI_REVIEW_BASE_URL || secrets.MOONSHOT_BASE_URL }}
+          AI_REVIEW_MAX_DIFF_CHARS: ${{ vars.AI_REVIEW_MAX_DIFF_CHARS || '100000' }}
+          AI_REVIEW_LANGUAGE: ${{ vars.AI_REVIEW_LANGUAGE || 'zh-CN' }}
+        run: node .github/scripts/ai-code-review.mjs --files changed-files.txt --diff pr.diff --out review.md
+
+      - name: Publish PR comment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REVIEW_FILE: review.md
+        run: node .github/scripts/pr-comment.mjs

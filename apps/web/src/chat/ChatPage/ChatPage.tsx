@@ -38,9 +38,22 @@ function MarkdownTyping({ content }: { content: string }) {
   );
 }
 
+/** MarkdownStatic：历史消息已完整落库，打开时直接展示，不再模拟流式输出。 */
+function MarkdownStatic({ content }: { content: string }) {
+  return (
+    <Typography>
+      <XMarkdown content={content} />
+    </Typography>
+  );
+}
+
 /** Bubble 通用渲染，传给 fallback markdown 气泡 / 错误气泡使用。 */
 const renderMarkdown: BubbleProps['contentRender'] = (content) => (
   <MarkdownTyping content={typeof content === 'string' ? content : String(content ?? '')} />
+);
+
+const renderStaticMarkdown: BubbleProps['contentRender'] = (content) => (
+  <MarkdownStatic content={typeof content === 'string' ? content : String(content ?? '')} />
 );
 
 /** 用户气泡：深墨色底 + 白字，右对齐。 */
@@ -297,6 +310,8 @@ function MessageRow({
   }
 
   const time = deriveMessageTime(message.id, message.createdAt);
+  const markdownRenderer =
+    message.textRenderMode === 'static' ? renderStaticMarkdown : renderMarkdown;
   const hasTripCardData = !!(
     message.weather ||
     message.attractions ||
@@ -313,7 +328,7 @@ function MessageRow({
           placement="start"
           variant="outlined"
           content={message.content || '请求失败'}
-          contentRender={renderMarkdown}
+          contentRender={markdownRenderer}
           className="travel-error-bubble"
         />
       </div>
@@ -378,7 +393,7 @@ function MessageRow({
         placement="start"
         variant="outlined"
         content={message.content}
-        contentRender={renderMarkdown}
+        contentRender={markdownRenderer}
       />
     </div>
   );
