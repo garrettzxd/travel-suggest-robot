@@ -30,6 +30,7 @@ export interface ToolTraceEntry {
  *   闲聊场景仍走 markdown bubble，不渲染卡片骨架。
  * - toolsStarted 累积本轮所有 tool_start 的工具名（仅 getWeather / getAttractions 会真的下发），
  *   TripCardView 据此决定是否为对应槽位预留骨架。
+ * - textRenderMode 区分 assistant 文本展示方式：当前对话流式输出，历史对话直接静态展示。
  *
  * 新增结构化卡片时，按这里加新槽 → eventHandlers.ts 加事件 → ChatPage 选择渲染分支。
  */
@@ -39,6 +40,7 @@ export interface TravelChatMessage {
   content: string;
   createdAt?: number;
   status?: 'local' | 'loading' | 'updating' | 'success' | 'error' | 'abort';
+  textRenderMode?: 'stream' | 'static';
   weather?: WeatherSnapshot;
   attractions?: Attraction[];
   progressiveCard?: ProgressiveTripCard;

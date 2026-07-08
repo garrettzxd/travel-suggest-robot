@@ -14,7 +14,7 @@
     "dev:server": "pnpm build:shared && pnpm --filter @travel/server dev",
     "dev:web": "pnpm build:shared && pnpm --filter @travel/web dev",
     "build": "pnpm -r build",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm build:shared && pnpm -r typecheck",
     "clean": "pnpm -r exec rm -rf dist",
     "prepare": "husky"
   },

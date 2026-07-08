@@ -37,6 +37,7 @@ function toTravelMessage(message: ChatMessageWithCards): TravelChatMessage {
     content: message.content,
     createdAt: message.createdAt,
     status: message.role === 'user' ? 'local' : 'success',
+    ...(message.role === 'assistant' ? { textRenderMode: 'static' as const } : {}),
     ...(message.card ? { card: message.card } : {}),
     ...(message.itinerary ? { itinerary: message.itinerary } : {}),
     ...(message.transport ? { transport: message.transport } : {}),
@@ -113,6 +114,7 @@ export function useTravelAgent(options: UseTravelAgentOptions = {}) {
         content: '',
         createdAt: assistantCreatedAt,
         status: 'loading',
+        textRenderMode: 'stream',
       },
     ]);
     setToolTrace([]);
