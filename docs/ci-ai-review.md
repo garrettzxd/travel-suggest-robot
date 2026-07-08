@@ -116,5 +116,6 @@ AI CR 依赖外部模型服务，可能受余额、限流、网络波动影响�
 通常说明本次 workflow 的 `GITHUB_TOKEN` 没有写 PR 评论权限。请检查：
 
 - 仓库 `Settings -> Actions -> General -> Workflow permissions` 是否为 `Read and write permissions`。
-- workflow 是否声明了 `issues: write`。
+- workflow 是否声明了 `issues: write` 和 `pull-requests: write`。
 - 当前 PR 是否来自 fork。fork PR 的 token 通常不能写仓库评论。
+- 如果仓库属于组织，还要检查组织级 `Settings -> Actions -> General -> Workflow permissions` 是否限制为只读。
