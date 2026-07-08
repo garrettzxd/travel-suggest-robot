@@ -166,7 +166,13 @@ async function main() {
 
 main().catch(async (error) => {
   const outPath = getArg("--out", "review.md");
-  const message = error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error
+    ? [
+        error.message,
+        error.cause instanceof Error ? `cause: ${error.cause.message}` : undefined,
+        error.cause?.code ? `cause code: ${error.cause.code}` : undefined,
+      ].filter(Boolean).join("\n")
+    : String(error);
   const fallback = `${MARKER}
 
 ## AI Code Review
