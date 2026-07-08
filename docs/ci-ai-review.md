@@ -47,9 +47,9 @@ AI_REVIEW_BASE_URL
 在 GitHub 仓库 `Settings -> Secrets and variables -> Actions -> Variables` 中配置：
 
 ```text
-AI_REVIEW_MAX_DIFF_CHARS=35000
+AI_REVIEW_MAX_DIFF_CHARS=20000
 AI_REVIEW_LANGUAGE=zh-CN
-AI_REVIEW_MAX_OUTPUT_TOKENS=1800
+AI_REVIEW_MAX_OUTPUT_TOKENS=6000
 ```
 
 ## 触发规则

@@ -54,8 +54,9 @@ jobs:
           MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
           MOONSHOT_MODEL: ${{ secrets.MOONSHOT_MODEL }}
           MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
-          AI_REVIEW_MAX_DIFF_CHARS: ${{ vars.AI_REVIEW_MAX_DIFF_CHARS || '35000' }}
+          AI_REVIEW_MAX_DIFF_CHARS: ${{ vars.AI_REVIEW_MAX_DIFF_CHARS || '20000' }}
           AI_REVIEW_LANGUAGE: ${{ vars.AI_REVIEW_LANGUAGE || 'zh-CN' }}
+          AI_REVIEW_MAX_OUTPUT_TOKENS: ${{ vars.AI_REVIEW_MAX_OUTPUT_TOKENS || '6000' }}
         run: node .github/scripts/ai-code-review.mjs --files changed-files.txt --diff pr.diff --out review.md --inline-out review-inline.json
 
       - name: Publish PR comment

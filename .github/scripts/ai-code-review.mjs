@@ -182,8 +182,8 @@ async function main() {
   const model = requiredAnyEnv("AI_REVIEW_MODEL", "MOONSHOT_MODEL");
   const baseUrl = firstEnv("AI_REVIEW_BASE_URL", "MOONSHOT_BASE_URL") || "https://api.moonshot.cn/v1";
   const chatCompletionsUrl = buildChatCompletionsUrl(baseUrl);
-  const maxDiffChars = Number.parseInt(process.env.AI_REVIEW_MAX_DIFF_CHARS || "35000", 10);
-  const maxOutputTokens = Number.parseInt(process.env.AI_REVIEW_MAX_OUTPUT_TOKENS || "1800", 10);
+  const maxDiffChars = Number.parseInt(process.env.AI_REVIEW_MAX_DIFF_CHARS || "20000", 10);
+  const maxOutputTokens = Number.parseInt(process.env.AI_REVIEW_MAX_OUTPUT_TOKENS || "6000", 10);
   const language = process.env.AI_REVIEW_LANGUAGE || "zh-CN";
 
   const [changedFiles, rawDiff] = await Promise.all([
@@ -191,7 +191,7 @@ async function main() {
     readFile(diffPath, "utf8"),
   ]);
 
-  const { text: diff, truncated } = truncate(rawDiff, Number.isFinite(maxDiffChars) ? maxDiffChars : 35000);
+  const { text: diff, truncated } = truncate(rawDiff, Number.isFinite(maxDiffChars) ? maxDiffChars : 20000);
   console.log(`Changed files chars: ${changedFiles.length}`);
   console.log(`Raw diff chars: ${rawDiff.length}`);
   console.log(`Sent diff chars: ${diff.length}${truncated ? " (truncated)" : ""}`);
@@ -215,7 +215,7 @@ async function main() {
           content: prompt,
         },
       ],
-      max_tokens: Number.isFinite(maxOutputTokens) ? maxOutputTokens : 1800,
+      max_tokens: Number.isFinite(maxOutputTokens) ? maxOutputTokens : 6000,
     }),
   });
 
@@ -227,7 +227,13 @@ async function main() {
   const data = await response.json();
   const content = data?.choices?.[0]?.message?.content?.trim();
   if (!content) {
-    throw new Error("AI review response did not contain choices[0].message.content");
+    const choice = data?.choices?.[0];
+    throw new Error([
+      "AI review response did not contain choices[0].message.content",
+      choice?.finish_reason ? `finish_reason: ${choice.finish_reason}` : undefined,
+      data?.usage ? `usage: ${JSON.stringify(data.usage)}` : undefined,
+      choice?.message?.reasoning_content ? `reasoning_content_chars: ${choice.message.reasoning_content.length}` : undefined,
+    ].filter(Boolean).join("\n"));
   }
 
   const review = parseJsonResponse(content);
