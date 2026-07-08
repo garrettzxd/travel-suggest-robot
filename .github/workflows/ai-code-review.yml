@@ -56,10 +56,12 @@ jobs:
           MOONSHOT_BASE_URL: ${{ secrets.MOONSHOT_BASE_URL }}
           AI_REVIEW_MAX_DIFF_CHARS: ${{ vars.AI_REVIEW_MAX_DIFF_CHARS || '100000' }}
           AI_REVIEW_LANGUAGE: ${{ vars.AI_REVIEW_LANGUAGE || 'zh-CN' }}
-        run: node .github/scripts/ai-code-review.mjs --files changed-files.txt --diff pr.diff --out review.md
+        run: node .github/scripts/ai-code-review.mjs --files changed-files.txt --diff pr.diff --out review.md --inline-out review-inline.json
 
       - name: Publish PR comment
         env:
           GITHUB_TOKEN: ${{ github.token }}
           REVIEW_FILE: review.md
+          INLINE_REVIEW_FILE: review-inline.json
+          DIFF_FILE: pr.diff
         run: node .github/scripts/pr-comment.mjs
