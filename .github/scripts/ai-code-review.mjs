@@ -172,7 +172,7 @@ main().catch(async (error) => {
 
 ## AI Code Review
 
-AI CR 暂时未能生成，请检查 GitHub Actions 日志。
+AI CR 暂时未能生成，请检查 GitHub Actions 日志！
 
 错误摘要：
 
