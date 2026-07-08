@@ -126,44 +126,37 @@ ${review.merge_advice || "需要人工结合 CI 与业务上下文判断。"}
 }
 
 function buildPrompt({ changedFiles, diff, truncated, language }) {
-  return `你是一个资深代码审查助手。请只基于本次 PR 的变更文件列表和 diff 做审查，不要臆测 diff 中无法证明的问题。
+  return `你是资深代码审查助手。只审查本次 PR diff 中能被证实的问题。
 
 项目背景：
-- Monorepo: pnpm workspace
-- Node.js >= 24, pnpm 10
-- 前端: apps/web, React + Vite
-- 后端: apps/server, Koa + TypeScript
-- 共享包: packages/shared
-- 数据层: SQLite + Drizzle
-- 部署相关: Dockerfile.server, Dockerfile.web, docker-compose.yml
+- pnpm workspace, Node.js >= 24
+- apps/web: React + Vite
+- apps/server: Koa + TypeScript
+- packages/shared: workspace shared package
 
 审查要求：
-- 使用 ${language === "zh-CN" ? "中文" : language} 输出。
-- 优先指出会导致运行失败、类型错误、状态错乱、安全风险、数据一致性问题的缺陷。
-- 明确区分“必须修复”和“建议优化”。
-- 如果没有发现明确问题，请直接说明。
-- 不要输出泛泛的最佳实践。
-- 不要重复粘贴大段 diff。
-- 如果信息不足，请标注“需要人工确认”。
-- 行内评论只能针对 diff 中存在的新版本行号，也就是 + 行或上下文行的右侧行号。
-- 不要针对文件整体、旧版本删除行、没有出现在 diff 里的行生成行内评论。
-- inline_comments 最多输出 10 条，只保留最值得评论的问题。
+- 输出语言：${language === "zh-CN" ? "中文" : language}。
+- 优先找运行失败、类型错误、安全问题、状态/数据不一致、明显边界条件缺陷。
+- 不要泛泛而谈，不要重复 diff，不确定就不要作为问题输出。
+- inline_comments 最多 5 条，只评论最重要且能定位到 diff 新版本行号的问题。
+- inline_comments.line 必须是 diff 中存在的右侧行号（+ 行或上下文行），不能是删除行或文件外行。
+- 必须只输出合法 JSON，不能使用 Markdown，不能包裹代码块。
 
-输出必须是合法 JSON，不要使用 Markdown，不要包裹代码块。结构如下：
+JSON 结构：
 {
-  "summary": "一句到三句话的总体结论",
-  "high_risk": ["高风险问题，没有则空数组"],
-  "medium_risk": ["中风险问题，没有则空数组"],
-  "low_risk": ["低风险建议，没有则空数组"],
-  "tests": ["测试建议，没有则空数组"],
-  "merge_advice": "是否建议合并以及原因",
+  "summary": "1-2 句话",
+  "high_risk": [],
+  "medium_risk": [],
+  "low_risk": [],
+  "tests": [],
+  "merge_advice": "简短合并建议",
   "inline_comments": [
     {
-      "path": "相对仓库根目录的文件路径",
+      "path": "file path",
       "line": 123,
       "severity": "high|medium|low",
-      "title": "简短标题",
-      "body": "适合直接发到代码行上的评论，说明具体问题和建议"
+      "title": "短标题",
+      "body": "具体问题和建议，80-180 字"
     }
   ]
 }
@@ -189,7 +182,8 @@ async function main() {
   const model = requiredAnyEnv("AI_REVIEW_MODEL", "MOONSHOT_MODEL");
   const baseUrl = firstEnv("AI_REVIEW_BASE_URL", "MOONSHOT_BASE_URL") || "https://api.moonshot.cn/v1";
   const chatCompletionsUrl = buildChatCompletionsUrl(baseUrl);
-  const maxDiffChars = Number.parseInt(process.env.AI_REVIEW_MAX_DIFF_CHARS || "100000", 10);
+  const maxDiffChars = Number.parseInt(process.env.AI_REVIEW_MAX_DIFF_CHARS || "35000", 10);
+  const maxOutputTokens = Number.parseInt(process.env.AI_REVIEW_MAX_OUTPUT_TOKENS || "1800", 10);
   const language = process.env.AI_REVIEW_LANGUAGE || "zh-CN";
 
   const [changedFiles, rawDiff] = await Promise.all([
@@ -197,7 +191,10 @@ async function main() {
     readFile(diffPath, "utf8"),
   ]);
 
-  const { text: diff, truncated } = truncate(rawDiff, Number.isFinite(maxDiffChars) ? maxDiffChars : 100000);
+  const { text: diff, truncated } = truncate(rawDiff, Number.isFinite(maxDiffChars) ? maxDiffChars : 35000);
+  console.log(`Changed files chars: ${changedFiles.length}`);
+  console.log(`Raw diff chars: ${rawDiff.length}`);
+  console.log(`Sent diff chars: ${diff.length}${truncated ? " (truncated)" : ""}`);
   const prompt = buildPrompt({ changedFiles, diff, truncated, language });
 
   const response = await fetch(chatCompletionsUrl, {
@@ -218,6 +215,7 @@ async function main() {
           content: prompt,
         },
       ],
+      max_tokens: Number.isFinite(maxOutputTokens) ? maxOutputTokens : 1800,
     }),
   });
 
@@ -233,7 +231,7 @@ async function main() {
   }
 
   const review = parseJsonResponse(content);
-  const inlineComments = normalizeInlineComments(review.inline_comments).slice(0, 10);
+  const inlineComments = normalizeInlineComments(review.inline_comments).slice(0, 5);
 
   await Promise.all([
     writeFile(outPath, renderMarkdown(review, inlineComments), "utf8"),

@@ -47,8 +47,9 @@ AI_REVIEW_BASE_URL
 在 GitHub 仓库 `Settings -> Secrets and variables -> Actions -> Variables` 中配置：
 
 ```text
-AI_REVIEW_MAX_DIFF_CHARS=100000
+AI_REVIEW_MAX_DIFF_CHARS=35000
 AI_REVIEW_LANGUAGE=zh-CN
+AI_REVIEW_MAX_OUTPUT_TOKENS=1800
 ```
 
 ## 触发规则
@@ -94,7 +95,7 @@ AI CR 评论包含固定标记：
 
 每次 PR 更新时，脚本会优先更新已有 AI CR 评论，避免重复刷屏。
 
-AI CR 还会根据模型输出发布最多 10 条行内 review comments。行内评论只会发布到当前 diff 中存在的新版本行号；如果模型返回的文件或行号不在 diff 里，脚本会自动丢弃，避免 GitHub API 报 422。
+AI CR 还会根据模型输出发布最多 5 条行内 review comments。行内评论只会发布到当前 diff 中存在的新版本行号；如果模型返回的文件或行号不在 diff 里，脚本会自动丢弃，避免 GitHub API 报 422。
 
 行内评论包含固定标记：
 
